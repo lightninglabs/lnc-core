@@ -1,6 +1,7 @@
 {
    "extends": ["tslint:recommended", "tslint-config-prettier"],
    "rules": {
+        "ban-types": false,
         "max-line-length": {
             "options": [120]
         },
@@ -23,4 +24,3 @@
         ]
     }
 }
-
