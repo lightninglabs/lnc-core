@@ -160,7 +160,7 @@ protoc/bin/protoc \
   auctioneerrpc/auctioneer.proto \
   auctioneerrpc/hashmail.proto
 
-echo "FARADY: generating schema..."
+echo "FARADAY: generating schema..."
 mkdir -p "$SCHEMA_DIR/faraday"
 protoc/bin/protoc \
   --proto_path=protos/faraday/${FARADAY_RELEASE_TAG} \
