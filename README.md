@@ -26,7 +26,7 @@ Then run the following commands:
 
 ```
 # download schemas
-npm run update-protos
+yarn run update-protos
 # format schemas
-npm run generate
+yarn run generate
 ```

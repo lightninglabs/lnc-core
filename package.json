@@ -19,10 +19,10 @@
     "prettier": "prettier --check '**/*.ts*'",
     "prettier-write": "prettier --check --write '**/*.ts*'",
     "lint": "tslint -p tsconfig.json",
-    "prepare": "npm run build",
-    "prepublishOnly": "npm run lint",
-    "preversion": "npm run lint",
-    "version": "npm run prettier && git add -A lib",
+    "prepare": "yarn run build",
+    "prepublishOnly": "yarn run lint",
+    "preversion": "yarn run lint",
+    "version": "yarn run prettier && git add -A lib",
     "postversion": "git push && git push --tags"
   },
   "repository": {
