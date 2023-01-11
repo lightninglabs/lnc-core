@@ -7,12 +7,14 @@ LND_RELEASE_TAG=$1
 LOOP_RELEASE_TAG=$2
 POOL_RELEASE_TAG=$3
 FARADAY_RELEASE_TAG=$4
-PROTOC_VERSION=$5
+LIT_RELEASE_TAG=$5
+PROTOC_VERSION=$6
 
 echo "LND release tag:" $LND_RELEASE_TAG
 echo "Loop release tag:" $LOOP_RELEASE_TAG
 echo "Pool release tag:" $POOL_RELEASE_TAG
 echo "Faraday release tag:" $FARADAY_RELEASE_TAG
+echo "LiT release tag:" $LIT_RELEASE_TAG
 echo "Protoc version:" $PROTOC_VERSION
 
 GENERATED_TYPES_DIR=lib/types/proto
@@ -104,6 +106,17 @@ protoc/bin/protoc \
   $TS_PROTO_OPTIONS \
   faraday.proto
 
+echo "LiT: running protoc..."
+mkdir -p "$GENERATED_TYPES_DIR/lit"
+protoc/bin/protoc \
+  --proto_path=protos/lit/${LIT_RELEASE_TAG} \
+  --plugin=./node_modules/.bin/protoc-gen-ts_proto \
+  --ts_proto_out=$GENERATED_TYPES_DIR/lit \
+  $TS_PROTO_OPTIONS \
+  firewall.proto \
+  lit-sessions.proto \
+  lit-autopilot.proto 
+
 # Temporarily generate schema files in order to provide metadata
 # about the services and subscription methods to the api classes
 SCHEMA_DIR=lib/types/schema
@@ -168,6 +181,17 @@ protoc/bin/protoc \
   --ts_proto_out=$SCHEMA_DIR/faraday \
   $SCHEMA_PROTO_OPTIONS \
   faraday.proto
+
+echo "LIT: generating schema..."
+mkdir -p "$SCHEMA_DIR/lit"
+protoc/bin/protoc \
+  --proto_path=protos/lit/${LIT_RELEASE_TAG} \
+  --plugin=./node_modules/.bin/protoc-gen-ts_proto \
+  --ts_proto_out=$SCHEMA_DIR/lit \
+  $SCHEMA_PROTO_OPTIONS \
+  firewall.proto \
+  lit-sessions.proto \
+  lit-autopilot.proto 
 
 # Cleanup proto directory/files
 rm -rf *.proto protoc

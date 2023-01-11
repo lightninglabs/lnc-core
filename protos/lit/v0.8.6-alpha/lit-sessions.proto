@@ -1,0 +1,251 @@
+syntax = "proto3";
+
+package litrpc;
+
+option go_package = "github.com/lightninglabs/lightning-terminal/litrpc";
+
+// Sessions is a service that gives access to the core functionalities of the
+// daemon's session system.
+service Sessions {
+    rpc AddSession (AddSessionRequest) returns (AddSessionResponse);
+
+    rpc ListSessions (ListSessionsRequest) returns (ListSessionsResponse);
+
+    rpc RevokeSession (RevokeSessionRequest) returns (RevokeSessionResponse);
+}
+
+enum SessionType {
+    TYPE_MACAROON_READONLY = 0;
+    TYPE_MACAROON_ADMIN = 1;
+    TYPE_MACAROON_CUSTOM = 2;
+    TYPE_UI_PASSWORD = 3;
+    TYPE_AUTOPILOT = 4;
+    TYPE_MACAROON_ACCOUNT = 5;
+}
+
+message AddSessionRequest {
+    string label = 1;
+
+    SessionType session_type = 2;
+
+    uint64 expiry_timestamp_seconds = 3 [jstype = JS_STRING];
+
+    string mailbox_server_addr = 4;
+
+    bool dev_server = 5;
+
+    repeated MacaroonPermission macaroon_custom_permissions = 6;
+
+    string account_id = 7;
+}
+
+message MacaroonPermission {
+    // The entity a permission grants access to. If a entity is set to the
+    // "uri" keyword then the action entry should be one of the special cases
+    // described in the comment for action.
+    string entity = 1;
+
+    // The action that is granted. If entity is set to "uri", then action must
+    // be set to either:
+    //  - a particular URI to which access should be granted.
+    //  - a URI regex, in which case access will be granted to each URI that
+    //    matches the regex.
+    //  - the "***readonly***" keyword. This will result in the access being
+    //    granted to all read-only endpoints.
+    string action = 2;
+}
+
+enum SessionState {
+    STATE_CREATED = 0;
+    STATE_IN_USE = 1;
+    STATE_REVOKED = 2;
+    STATE_EXPIRED = 3;
+}
+
+message AddSessionResponse {
+    Session session = 1;
+}
+
+message Session {
+    bytes id = 14;
+
+    string label = 1;
+
+    SessionState session_state = 2;
+
+    SessionType session_type = 3;
+
+    uint64 expiry_timestamp_seconds = 4 [jstype = JS_STRING];
+
+    string mailbox_server_addr = 5;
+
+    bool dev_server = 6;
+
+    bytes pairing_secret = 7;
+
+    string pairing_secret_mnemonic = 8;
+
+    bytes local_public_key = 9;
+
+    bytes remote_public_key = 10;
+
+    uint64 created_at = 11 [jstype = JS_STRING];
+
+    MacaroonRecipe macaroon_recipe = 12;
+
+    string account_id = 13;
+
+    map<string, RulesMap> autopilot_feature_info = 15;
+
+    /*
+    The unix timestamp indicating the time at which the session was revoked.
+    Note that this field has not been around since the beginning and so it
+    could be the case that a session has been revoked but that this field
+    will not have been set for that session. Therefore, it is suggested that
+    readers should not assume that if this field is zero that the session is
+    not revoked. Readers should instead first check the session_state field.
+    */
+    uint64 revoked_at = 16 [jstype = JS_STRING];
+}
+
+message MacaroonRecipe {
+    repeated MacaroonPermission permissions = 1;
+
+    repeated string caveats = 2;
+}
+
+message ListSessionsRequest {
+}
+
+message ListSessionsResponse {
+    repeated Session sessions = 1;
+}
+
+message RevokeSessionRequest {
+    bytes local_public_key = 8;
+}
+
+message RevokeSessionResponse {
+}
+
+message RulesMap {
+    /*
+    A map of rule name to RuleValue. The RuleValue should be parsed based on
+    the name of the rule.
+    */
+    map<string, RuleValue> rules = 1;
+}
+
+message RuleValue {
+    oneof value {
+        RateLimit rate_limit = 1;
+        ChannelPolicyBounds chan_policy_bounds = 2;
+        HistoryLimit history_limit = 3;
+        OffChainBudget off_chain_budget = 4;
+        OnChainBudget on_chain_budget = 5;
+        SendToSelf send_to_self = 6;
+        ChannelRestrict channel_restrict = 7;
+        PeerRestrict peer_restrict = 8;
+    }
+}
+
+message RateLimit {
+    /*
+    The rate limit for read-only calls.
+    */
+    Rate read_limit = 1;
+
+    /*
+    The rate limit for write/execution calls.
+    */
+    Rate write_limit = 2;
+}
+
+message Rate {
+    /*
+    The number of times a call is allowed in num_hours number of hours.
+    */
+    uint32 iterations = 1;
+
+    /*
+    The number of hours in which the iterations count takes place over.
+    */
+    uint32 num_hours = 2;
+}
+
+message HistoryLimit {
+    /*
+    The absolute unix timestamp in seconds before which no information should
+    be shared. This should only be set if duration is not set.
+    */
+    uint64 start_time = 1 [jstype = JS_STRING];
+
+    /*
+    The maximum relative duration in seconds that a request is allowed to query
+    for. This should only be set if start_time is not set.
+    */
+    uint64 duration = 2 [jstype = JS_STRING];
+}
+
+message ChannelPolicyBounds {
+    /*
+    The minimum base fee in msat that the autopilot can set for a channel.
+    */
+    uint64 min_base_msat = 1 [jstype = JS_STRING];
+
+    /*
+    The maximum base fee in msat that the autopilot can set for a channel.
+    */
+    uint64 max_base_msat = 2 [jstype = JS_STRING];
+
+    /*
+    The minimum ppm fee in msat that the autopilot can set for a channel.
+    */
+    uint32 min_rate_ppm = 3;
+
+    /*
+    The maximum ppm fee in msat that the autopilot can set for a channel.
+    */
+    uint32 max_rate_ppm = 4;
+
+    /*
+    The minimum cltv delta that the autopilot may set for a channel.
+    */
+    uint32 min_cltv_delta = 5;
+
+    /*
+    The maximum cltv delta that the autopilot may set for a channel.
+    */
+    uint32 max_cltv_delta = 6;
+
+    /*
+    The minimum htlc msat that the autopilot may set for a channel.
+    */
+    uint64 min_htlc_msat = 7 [jstype = JS_STRING];
+
+    /*
+    The maximum htlc msat that the autopilot may set for a channel.
+    */
+    uint64 max_htlc_msat = 8 [jstype = JS_STRING];
+}
+
+message OffChainBudget {
+    uint64 max_amt_msat = 1 [jstype = JS_STRING];
+    uint64 max_fees_msat = 2 [jstype = JS_STRING];
+}
+
+message OnChainBudget {
+    uint64 absolute_amt_sats = 1 [jstype = JS_STRING];
+    uint64 max_sat_per_v_byte = 2 [jstype = JS_STRING];
+}
+
+message SendToSelf {
+}
+
+message ChannelRestrict {
+    repeated uint64 channel_ids = 1 [jstype = JS_STRING];
+}
+
+message PeerRestrict {
+    repeated string peer_ids = 1;
+}
