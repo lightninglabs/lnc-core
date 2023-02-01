@@ -325,19 +325,12 @@ export interface SwapResponse {
      * depending on the request, the semantics are different.
      * - For internal loop-in htlc_address contains the address of the
      * native segwit (P2WSH) htlc.
-     * - For external loop-in htlc_address contains the address of the
-     * nested segwit (NP2WSH) htlc.
-     * - For loop-out htlc_address always contains the native segwit (P2WSH)
+     * /    - For loop-out htlc_address always contains the native segwit (P2WSH)
      * htlc address.
      *
      * @deprecated
      */
     htlcAddress: string;
-    /**
-     * The nested segwit address of the on-chain htlc.
-     * This field remains empty for loop-out.
-     */
-    htlcAddressNp2wsh: string;
     /**
      * The native segwit address of the on-chain htlc.
      * Used for both loop-in and loop-out.
@@ -385,8 +378,6 @@ export interface SwapStatus {
      * DEPRECATED:  This field stores the address of the onchain htlc.
      * - For internal loop-in htlc_address contains the address of the
      * native segwit (P2WSH) htlc.
-     * - For external loop-in htlc_address contains the nested segwit (NP2WSH)
-     * address.
      * - For loop-out htlc_address always contains the native segwit (P2WSH)
      * htlc address.
      *
@@ -395,8 +386,6 @@ export interface SwapStatus {
     htlcAddress: string;
     /** HTLC address (native segwit), used in loop-in and loop-out swaps. */
     htlcAddressP2wsh: string;
-    /** HTLC address (nested segwit), used in loop-in swaps only. */
-    htlcAddressNp2wsh: string;
     /** The address of the v3 (taproot) htlc. Used for both loop-in and loop-out. */
     htlcAddressP2tr: string;
     /** Swap server cost */
@@ -661,6 +650,11 @@ export interface LiquidityParameters {
     maxSwapAmount: string;
     /** The confirmation target for loop in on-chain htlcs. */
     htlcConfTarget: number;
+    /**
+     * The destination address to use for autoloop loop outs. Set to "default" in
+     * order to revert to default behavior.
+     */
+    autoloopDestAddress: string;
 }
 
 export interface LiquidityRule {
