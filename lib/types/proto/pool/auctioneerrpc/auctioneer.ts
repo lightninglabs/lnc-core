@@ -63,6 +63,20 @@ export enum OrderChannelType {
     UNRECOGNIZED = 'UNRECOGNIZED'
 }
 
+export enum AuctionType {
+    /**
+     * AUCTION_TYPE_BTC_INBOUND_LIQUIDITY - Default auction type where the bidder is paying for getting bitcoin inbound
+     * liqiudity from the asker.
+     */
+    AUCTION_TYPE_BTC_INBOUND_LIQUIDITY = 'AUCTION_TYPE_BTC_INBOUND_LIQUIDITY',
+    /**
+     * AUCTION_TYPE_BTC_OUTBOUND_LIQUIDITY - Auction type where the bidder is paying the asker to accept a channel
+     * (bitcoin outbound liquidity) from the bidder.
+     */
+    AUCTION_TYPE_BTC_OUTBOUND_LIQUIDITY = 'AUCTION_TYPE_BTC_OUTBOUND_LIQUIDITY',
+    UNRECOGNIZED = 'UNRECOGNIZED'
+}
+
 export enum NodeTier {
     /**
      * TIER_DEFAULT - The default node tier. This value will be determined at run-time by the
@@ -82,6 +96,22 @@ export enum NodeTier {
      * submitting bid orders.
      */
     TIER_1 = 'TIER_1',
+    UNRECOGNIZED = 'UNRECOGNIZED'
+}
+
+/** Channel announcement constraints for matched channels. */
+export enum ChannelAnnouncementConstraints {
+    ANNOUNCEMENT_NO_PREFERENCE = 'ANNOUNCEMENT_NO_PREFERENCE',
+    ONLY_ANNOUNCED = 'ONLY_ANNOUNCED',
+    ONLY_UNANNOUNCED = 'ONLY_UNANNOUNCED',
+    UNRECOGNIZED = 'UNRECOGNIZED'
+}
+
+/** Channel confirmation constraints for matched channels. */
+export enum ChannelConfirmationConstraints {
+    CONFIRMATION_NO_PREFERENCE = 'CONFIRMATION_NO_PREFERENCE',
+    ONLY_CONFIRMED = 'ONLY_CONFIRMED',
+    ONLY_ZEROCONF = 'ONLY_ZEROCONF',
     UNRECOGNIZED = 'UNRECOGNIZED'
 }
 
@@ -127,13 +157,23 @@ export interface ReserveAccountRequest {
     accountExpiry: number;
     /** The trader's account key. */
     traderKey: Uint8Array | string;
+    /** The account version. Must be set to 0 for legacy (non-taproot) accounts. */
+    version: number;
 }
 
 export interface ReserveAccountResponse {
     /**
      * The base key of the auctioneer. This key should be tweaked with the trader's
      * per-batch tweaked key to obtain the corresponding per-batch tweaked
-     * auctioneer key.
+     * auctioneer key. Or, in case of the version 1, Taproot enabled account, the
+     * trader and auctioneer key will be combined into a MuSig2 combined key that
+     * is static throughout the lifetime of the account. The on-chain uniqueness of
+     * the generated output will be ensured by the merkle root hash that is applied
+     * as a tweak to the MuSig2 combined internal key. The merkle root hash is
+     * either the hash of the timeout script path (which uses the trader key
+     * tweaked with the per-batch key) directly or the root of a tree with one leaf
+     * that is the timeout script path and a leaf that is a Taro commitment (which
+     * is a root hash by itself).
      */
     auctioneerKey: Uint8Array | string;
     /**
@@ -152,7 +192,12 @@ export interface ServerInitAccountRequest {
      * account value below.
      */
     accountPoint: OutPoint | undefined;
-    /** The script used to create the account point. */
+    /**
+     * The script used to create the account point. For version 1 (Taproot enabled)
+     * accounts this represents the 32-byte (x-only) Taproot public key with the
+     * combined MuSig2 key of the auctioneer's key and the trader's key with the
+     * expiry script path applied as a single tapscript leaf.
+     */
     accountScript: Uint8Array | string;
     /**
      * The value of the account in satoshis. Must match the amount of the
@@ -173,6 +218,8 @@ export interface ServerInitAccountRequest {
      *    litd/v0.4.0-alpha/commit=326d754,initiator=lit-ui
      */
     userAgent: string;
+    /** The account version. Must be set to 0 for legacy (non-taproot) accounts. */
+    version: number;
 }
 
 export interface ServerInitAccountResponse {}
@@ -382,6 +429,11 @@ export interface OrderMatchSign {
      * transaction. The map key corresponds to the trader's account key of the
      * account in the batch transaction. The account key/ID has to be hex encoded
      * into a string because protobuf doesn't allow bytes as a map key data type.
+     * For version 1 (Taproot enabled) accounts, this merely represents a partial
+     * MuSig2 signature that can be combined into a full signature by the auction
+     * server by adding its own partial signature. A set of nonces will be provided
+     * by the trader for each v1 account to allow finalizing the MuSig2 signing
+     * session.
      */
     accountSigs: { [key: string]: Uint8Array | string };
     /**
@@ -391,6 +443,13 @@ export interface OrderMatchSign {
      * outpoint.
      */
     channelInfos: { [key: string]: ChannelInfo };
+    /**
+     * A set of 66-byte nonces for each version 1 (Taproot enabled) account. The
+     * nonces can be used to produce a MuSig2 partial signature to spend the
+     * account using the key spend path, which is a MuSig2 combined key of the
+     * auctioneer key and the trader key.
+     */
+    traderNonces: { [key: string]: Uint8Array | string };
 }
 
 export interface OrderMatchSign_AccountSigsEntry {
@@ -401,6 +460,11 @@ export interface OrderMatchSign_AccountSigsEntry {
 export interface OrderMatchSign_ChannelInfosEntry {
     key: string;
     value: ChannelInfo | undefined;
+}
+
+export interface OrderMatchSign_TraderNoncesEntry {
+    key: string;
+    value: Uint8Array | string;
 }
 
 export interface AccountRecovery {
@@ -551,9 +615,34 @@ export interface OrderMatchPrepare_MatchedMarketsEntry {
     value: MatchedMarket | undefined;
 }
 
+export interface TxOut {
+    /** The value of the transaction output in satoshis. */
+    value: string;
+    /** The public key script of the output. */
+    pkScript: Uint8Array | string;
+}
+
 export interface OrderMatchSignBegin {
     /** The 32 byte unique identifier of this batch. */
     batchId: Uint8Array | string;
+    /**
+     * A set of 66-byte nonces for each version 1 (Taproot enabled) account. The
+     * nonces can be used to produce a MuSig2 partial signature to spend the
+     * account using the key spend path, which is a MuSig2 combined key of the
+     * auctioneer key and the trader key.
+     */
+    serverNonces: { [key: string]: Uint8Array | string };
+    /**
+     * The full list of UTXO information for each of the inputs being spent. This
+     * is required when spending one or more Taproot enabled (account version 1)
+     * outputs.
+     */
+    prevOutputs: TxOut[];
+}
+
+export interface OrderMatchSignBegin_ServerNoncesEntry {
+    key: string;
+    value: Uint8Array | string;
 }
 
 export interface OrderMatchFinalize {
@@ -636,6 +725,8 @@ export interface AuctionAccount {
      * after the account has met its initial funding confirmation.
      */
     latestTx: Uint8Array | string;
+    /** The account version. Will be set to 0 for legacy (non-taproot) accounts. */
+    version: number;
 }
 
 export interface MatchedOrder {
@@ -689,6 +780,12 @@ export interface AccountDiff {
      * value.
      */
     newExpiry: number;
+    /**
+     * The new account version used to verify the batch. If this is non-zero, it
+     * means the account was automatically upgraded to the given version during the
+     * batch execution.
+     */
+    newVersion: number;
 }
 
 export enum AccountDiff_AccountState {
@@ -742,6 +839,13 @@ export interface ServerOrder {
      * with the `allowed_node_ids` field.
      */
     notAllowedNodeIds: Uint8Array | string[];
+    /** Auction type where this order must be considered during the matching. */
+    auctionType: AuctionType;
+    /**
+     * Flag used to signal that this order can be shared in public market
+     * places.
+     */
+    isPublic: boolean;
 }
 
 export interface ServerBid {
@@ -766,9 +870,9 @@ export interface ServerBid {
      * Give the incoming channel that results from this bid being matched an
      * initial outbound balance by adding additional funds from the taker's account
      * into the channel. As a simplification for the execution protocol and the
-     * channel reserve calculations, the self_chan_balance can be at most the same
-     * as the order amount and the min_chan_amt must be set to the full order
-     * amount.
+     * channel reserve calculations the min_chan_amt must be set to the full order
+     * amount. For the inbound liquidity market the self_chan_balance can be at
+     * most the same as the order amount.
      */
     selfChanBalance: string;
     /**
@@ -778,6 +882,10 @@ export interface ServerBid {
      * correspond to the recipient node's details.
      */
     isSidecarChannel: boolean;
+    /** Signals if this bid is interested in an announced or unannounced channel. */
+    unannouncedChannel: boolean;
+    /** Signals if this bid is interested in a zero conf channel or not. */
+    zeroConfChannel: boolean;
 }
 
 export interface ServerAsk {
@@ -793,6 +901,13 @@ export interface ServerAsk {
      * features are added.
      */
     version: number;
+    /** The constraints for selling the liquidity based on channel discoverability. */
+    announcementConstraints: ChannelAnnouncementConstraints;
+    /**
+     * The constraints for selling the liquidity based on the number of
+     * blocks before considering the channel confirmed.
+     */
+    confirmationConstraints: ChannelConfirmationConstraints;
 }
 
 export interface CancelOrder {
@@ -844,6 +959,19 @@ export interface ServerModifyAccountRequest {
     newOutputs: ServerOutput[];
     /** The new parameters to apply for the account. */
     newParams: ServerModifyAccountRequest_NewAccountParameters | undefined;
+    /**
+     * A set of 66-byte nonces for each version 1 (Taproot enabled) account. The
+     * nonces can be used to produce a MuSig2 partial signature to spend the
+     * account using the key spend path, which is a MuSig2 combined key of the
+     * auctioneer key and the trader key.
+     */
+    traderNonces: Uint8Array | string;
+    /**
+     * The full list of UTXO information for each of the inputs being spent. This
+     * is required when spending a Taproot enabled (account version 1) output or
+     * when adding additional Taproot inputs.
+     */
+    prevOutputs: TxOut[];
 }
 
 export interface ServerModifyAccountRequest_NewAccountParameters {
@@ -851,14 +979,27 @@ export interface ServerModifyAccountRequest_NewAccountParameters {
     value: string;
     /** The new expiry of the account as an absolute height. */
     expiry: number;
+    /** The new version of the account. */
+    version: number;
 }
 
 export interface ServerModifyAccountResponse {
     /**
      * The auctioneer's signature that allows a trader to broadcast a transaction
-     * spending from an account output.
+     * spending from an account output. For version 1 (Taproot enabled) accounts,
+     * this merely represents a partial MuSig2 signature that can be combined into
+     * a full signature by the trader daemon by adding its own partial signature. A
+     * set of nonces will be provided by the server (in case this is a v1 account)
+     * to allow finalizing the MuSig2 signing session.
      */
     accountSig: Uint8Array | string;
+    /**
+     * An optional set of 66-byte nonces for a version 1 (Taproot enabled) account
+     * spend. The nonces can be used to produce a MuSig2 partial signature to spend
+     * the account using the key spend path, which is a MuSig2 combined key of the
+     * auctioneer key and the trader key.
+     */
+    serverNonces: Uint8Array | string;
 }
 
 export interface ServerOrderStateRequest {

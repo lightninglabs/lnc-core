@@ -2,7 +2,10 @@
 import type {
     OrderState,
     OrderChannelType,
+    AuctionType,
     NodeTier,
+    ChannelAnnouncementConstraints,
+    ChannelConfirmationConstraints,
     DurationBucketState,
     OutPoint,
     InvalidOrder,
@@ -14,6 +17,23 @@ import type {
     BatchSnapshotRequest,
     BatchSnapshotsRequest
 } from './auctioneerrpc/auctioneer';
+
+export enum AccountVersion {
+    /**
+     * ACCOUNT_VERSION_LND_DEPENDENT - Let the version of lnd decide. If a version of lnd >= 0.15.0-beta is
+     * detected then a Taproot account is created. For earlier versions a legacy
+     * account is created.
+     */
+    ACCOUNT_VERSION_LND_DEPENDENT = 'ACCOUNT_VERSION_LND_DEPENDENT',
+    /** ACCOUNT_VERSION_LEGACY - A legacy SegWit v0 p2wsh account with a single script. */
+    ACCOUNT_VERSION_LEGACY = 'ACCOUNT_VERSION_LEGACY',
+    /**
+     * ACCOUNT_VERSION_TAPROOT - A Taproot enabled account with MuSig2 combined internal key and the expiry
+     * script as a single tap script leaf.
+     */
+    ACCOUNT_VERSION_TAPROOT = 'ACCOUNT_VERSION_TAPROOT',
+    UNRECOGNIZED = 'UNRECOGNIZED'
+}
 
 export enum AccountState {
     /** PENDING_OPEN - The state of an account when it is pending its confirmation on-chain. */
@@ -133,6 +153,8 @@ export interface InitAccountRequest {
      * the account (pool CLI, LiT UI, other 3rd party UI).
      */
     initiator: string;
+    /** The version of account to create. */
+    version: AccountVersion;
 }
 
 export interface QuoteAccountRequest {
@@ -213,6 +235,12 @@ export interface WithdrawAccountRequest {
     absoluteExpiry: number | undefined;
     /** The new relative expiration height of the account. */
     relativeExpiry: number | undefined;
+    /**
+     * The new version of the account. If this is set and is a valid version
+     * greater than the account's current version, then the account is upgraded to
+     * that version during the withdrawal.
+     */
+    newVersion: AccountVersion;
 }
 
 export interface WithdrawAccountResponse {
@@ -236,6 +264,12 @@ export interface DepositAccountRequest {
     absoluteExpiry: number | undefined;
     /** The new relative expiration height of the account. */
     relativeExpiry: number | undefined;
+    /**
+     * The new version of the account. If this is set and is a valid version
+     * greater than the account's current version, then the account is upgraded to
+     * that version during the deposit.
+     */
+    newVersion: AccountVersion;
 }
 
 export interface DepositAccountResponse {
@@ -254,6 +288,12 @@ export interface RenewAccountRequest {
     relativeExpiry: number | undefined;
     /** The fee rate, in satoshis per kw, to use for the renewal transaction. */
     feeRateSatPerKw: string;
+    /**
+     * The new version of the account. If this is set and is a valid version
+     * greater than the account's current version, then the account is upgraded to
+     * that version during the renewal.
+     */
+    newVersion: AccountVersion;
 }
 
 export interface RenewAccountResponse {
@@ -299,6 +339,8 @@ export interface Account {
     state: AccountState;
     /** The hash of the account's latest transaction. */
     latestTxid: Uint8Array | string;
+    /** The current version of the account. */
+    version: AccountVersion;
 }
 
 export interface SubmitOrderRequest {
@@ -397,6 +439,13 @@ export interface Order {
      * with the `allowed_node_ids` field.
      */
     notAllowedNodeIds: Uint8Array | string[];
+    /** Auction type where this order must be considered during the matching. */
+    auctionType: AuctionType;
+    /**
+     * Flag used to signal that this order can be shared in public market
+     * places.
+     */
+    isPublic: boolean;
 }
 
 export interface Bid {
@@ -421,9 +470,9 @@ export interface Bid {
      * Give the incoming channel that results from this bid being matched an
      * initial outbound balance by adding additional funds from the taker's account
      * into the channel. As a simplification for the execution protocol and the
-     * channel reserve calculations, the self_chan_balance can be at most the same
-     * as the order amount and the min_chan_amt must be set to the full order
-     * amount.
+     * channel reserve calculations the min_chan_amt must be set to the full order
+     * amount. For the inbound liquidity market the self_chan_balance can be at
+     * most the same as the order amount.
      */
     selfChanBalance: string;
     /**
@@ -433,6 +482,10 @@ export interface Bid {
      * the base58 encoded ticket, including the prefix and the checksum.
      */
     sidecarTicket: string;
+    /** Signals if this bid is interested in an announced or unannounced channel. */
+    unannouncedChannel: boolean;
+    /** Signals if this bid is interested in a zero conf channel or not. */
+    zeroConfChannel: boolean;
 }
 
 export interface Ask {
@@ -448,6 +501,13 @@ export interface Ask {
      * features are added.
      */
     version: number;
+    /** The constraints for selling the liquidity based on channel discoverability. */
+    announcementConstraints: ChannelAnnouncementConstraints;
+    /**
+     * The constraints for selling the liquidity based on the number of
+     * blocks before considering the channel confirmed.
+     */
+    confirmationConstraints: ChannelConfirmationConstraints;
 }
 
 export interface QuoteOrderRequest {
@@ -899,6 +959,16 @@ export interface DecodedSidecarTicket {
     executionPendingChannelId: Uint8Array | string;
     /** The original, base58 encoded ticket. */
     encodedTicket: string;
+    /**
+     * If true, the channel acceptor for this ticket will expect an unannounced
+     * channel.
+     */
+    offerUnannouncedChannel: boolean;
+    /**
+     * If true, the channel acceptor for this ticket will expect a zero conf
+     * channel.
+     */
+    offerZeroConfChannel: boolean;
 }
 
 export interface RegisterSidecarRequest {
