@@ -28,6 +28,7 @@ module.exports = {
       name: '@lightninglabs/lnc-core',
       type: "umd",  // see https://webpack.js.org/configuration/output/#outputlibrarytype
     },
+    globalObject: 'this',
     path: path.resolve(__dirname, 'dist'),
   },
 };
