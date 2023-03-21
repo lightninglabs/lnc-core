@@ -194,8 +194,12 @@ export interface PeerRestrict {
  * daemon's session system.
  */
 export interface Sessions {
-    addSession(request?: DeepPartial<AddSessionRequest>): Promise<AddSessionResponse>;
-    listSessions(request?: DeepPartial<ListSessionsRequest>): Promise<ListSessionsResponse>;
+    addSession(
+        request?: DeepPartial<AddSessionRequest>
+    ): Promise<AddSessionResponse>;
+    listSessions(
+        request?: DeepPartial<ListSessionsRequest>
+    ): Promise<ListSessionsResponse>;
     revokeSession(
         request?: DeepPartial<RevokeSessionRequest>
     ): Promise<RevokeSessionResponse>;
@@ -219,4 +223,3 @@ type DeepPartial<T> = T extends Builtin
     : T extends {}
     ? { [K in keyof T]?: DeepPartial<T[K]> }
     : Partial<T>;
-    

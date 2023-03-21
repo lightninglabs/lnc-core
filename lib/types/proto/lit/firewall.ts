@@ -138,7 +138,9 @@ export interface Action {
 }
 
 export interface Firewall {
-    listActions(request?: DeepPartial<ListActionsRequest>): Promise<ListActionsResponse>;
+    listActions(
+        request?: DeepPartial<ListActionsRequest>
+    ): Promise<ListActionsResponse>;
     privacyMapConversion(
         request?: DeepPartial<PrivacyMapConversionRequest>
     ): Promise<PrivacyMapConversionResponse>;
@@ -162,4 +164,3 @@ type DeepPartial<T> = T extends Builtin
     : T extends {}
     ? { [K in keyof T]?: DeepPartial<T[K]> }
     : Partial<T>;
-    

@@ -1329,11 +1329,15 @@ export interface ChannelAuctioneer {
         request?: DeepPartial<ServerOrderStateRequest>
     ): Promise<ServerOrderStateResponse>;
     subscribeBatchAuction(
-        request?: DeepPartial<ClientAuctionMessage>
-    , onMessage?: (msg: ServerAuctionMessage) => void, onError?: (err: Error) => void): void;
+        request?: DeepPartial<ClientAuctionMessage>,
+        onMessage?: (msg: ServerAuctionMessage) => void,
+        onError?: (err: Error) => void
+    ): void;
     subscribeSidecar(
-        request?: DeepPartial<ClientAuctionMessage>
-    , onMessage?: (msg: ServerAuctionMessage) => void, onError?: (err: Error) => void): void;
+        request?: DeepPartial<ClientAuctionMessage>,
+        onMessage?: (msg: ServerAuctionMessage) => void,
+        onError?: (err: Error) => void
+    ): void;
     terms(request?: DeepPartial<TermsRequest>): Promise<TermsResponse>;
     relevantBatchSnapshot(
         request?: DeepPartial<RelevantBatchRequest>
@@ -1347,7 +1351,9 @@ export interface ChannelAuctioneer {
     batchSnapshots(
         request?: DeepPartial<BatchSnapshotsRequest>
     ): Promise<BatchSnapshotsResponse>;
-    marketInfo(request?: DeepPartial<MarketInfoRequest>): Promise<MarketInfoResponse>;
+    marketInfo(
+        request?: DeepPartial<MarketInfoRequest>
+    ): Promise<MarketInfoResponse>;
 }
 
 type Builtin =
@@ -1368,4 +1374,3 @@ type DeepPartial<T> = T extends Builtin
     : T extends {}
     ? { [K in keyof T]?: DeepPartial<T[K]> }
     : Partial<T>;
-    

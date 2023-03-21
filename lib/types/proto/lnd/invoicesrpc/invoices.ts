@@ -131,24 +131,32 @@ export interface Invoices {
      * Initially the current invoice state is always sent out.
      */
     subscribeSingleInvoice(
-        request?: DeepPartial<SubscribeSingleInvoiceRequest>
-    , onMessage?: (msg: Invoice) => void, onError?: (err: Error) => void): void;
+        request?: DeepPartial<SubscribeSingleInvoiceRequest>,
+        onMessage?: (msg: Invoice) => void,
+        onError?: (err: Error) => void
+    ): void;
     /**
      * CancelInvoice cancels a currently open invoice. If the invoice is already
      * canceled, this call will succeed. If the invoice is already settled, it will
      * fail.
      */
-    cancelInvoice(request?: DeepPartial<CancelInvoiceMsg>): Promise<CancelInvoiceResp>;
+    cancelInvoice(
+        request?: DeepPartial<CancelInvoiceMsg>
+    ): Promise<CancelInvoiceResp>;
     /**
      * AddHoldInvoice creates a hold invoice. It ties the invoice to the hash
      * supplied in the request.
      */
-    addHoldInvoice(request?: DeepPartial<AddHoldInvoiceRequest>): Promise<AddHoldInvoiceResp>;
+    addHoldInvoice(
+        request?: DeepPartial<AddHoldInvoiceRequest>
+    ): Promise<AddHoldInvoiceResp>;
     /**
      * SettleInvoice settles an accepted invoice. If the invoice is already
      * settled, this call will succeed.
      */
-    settleInvoice(request?: DeepPartial<SettleInvoiceMsg>): Promise<SettleInvoiceResp>;
+    settleInvoice(
+        request?: DeepPartial<SettleInvoiceMsg>
+    ): Promise<SettleInvoiceResp>;
     /**
      * LookupInvoiceV2 attempts to look up at invoice. An invoice can be refrenced
      * using either its payment hash, payment address, or set ID.
@@ -174,4 +182,3 @@ type DeepPartial<T> = T extends Builtin
     : T extends {}
     ? { [K in keyof T]?: DeepPartial<T[K]> }
     : Partial<T>;
-    

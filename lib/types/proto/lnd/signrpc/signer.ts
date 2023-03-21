@@ -455,7 +455,9 @@ export interface Signer {
      * in the TxOut field, the value in that same field, and finally the input
      * index.
      */
-    computeInputScript(request?: DeepPartial<SignReq>): Promise<InputScriptResp>;
+    computeInputScript(
+        request?: DeepPartial<SignReq>
+    ): Promise<InputScriptResp>;
     /**
      * SignMessage signs a message with the key specified in the key locator. The
      * returned signature is fixed-size LN wire format encoded.
@@ -463,7 +465,9 @@ export interface Signer {
      * The main difference to SignMessage in the main RPC is that a specific key is
      * used to sign the message instead of the node identity private key.
      */
-    signMessage(request?: DeepPartial<SignMessageReq>): Promise<SignMessageResp>;
+    signMessage(
+        request?: DeepPartial<SignMessageReq>
+    ): Promise<SignMessageResp>;
     /**
      * VerifyMessage verifies a signature over a message using the public key
      * provided. The signature must be fixed-size LN wire format encoded.
@@ -471,7 +475,9 @@ export interface Signer {
      * The main difference to VerifyMessage in the main RPC is that the public key
      * used to sign the message does not have to be a node known to the network.
      */
-    verifyMessage(request?: DeepPartial<VerifyMessageReq>): Promise<VerifyMessageResp>;
+    verifyMessage(
+        request?: DeepPartial<VerifyMessageReq>
+    ): Promise<VerifyMessageResp>;
     /**
      * DeriveSharedKey returns a shared secret key by performing Diffie-Hellman key
      * derivation between the ephemeral public key in the request and the node's
@@ -482,7 +488,9 @@ export interface Signer {
      * The resulting shared public key is serialized in the compressed format and
      * hashed with sha256, resulting in the final key length of 256bit.
      */
-    deriveSharedKey(request?: DeepPartial<SharedKeyRequest>): Promise<SharedKeyResponse>;
+    deriveSharedKey(
+        request?: DeepPartial<SharedKeyRequest>
+    ): Promise<SharedKeyResponse>;
     /**
      * MuSig2CombineKeys (experimental!) is a stateless helper RPC that can be used
      * to calculate the combined MuSig2 public key from a list of all participating
@@ -538,7 +546,9 @@ export interface Signer {
      * considered to be HIGHLY EXPERIMENTAL and subject to change in upcoming
      * releases. Backward compatibility is not guaranteed!
      */
-    muSig2Sign(request?: DeepPartial<MuSig2SignRequest>): Promise<MuSig2SignResponse>;
+    muSig2Sign(
+        request?: DeepPartial<MuSig2SignRequest>
+    ): Promise<MuSig2SignResponse>;
     /**
      * MuSig2CombineSig (experimental!) combines the given partial signature(s)
      * with the local one, if it already exists. Once a partial signature of all
@@ -584,4 +594,3 @@ type DeepPartial<T> = T extends Builtin
     : T extends {}
     ? { [K in keyof T]?: DeepPartial<T[K]> }
     : Partial<T>;
-    

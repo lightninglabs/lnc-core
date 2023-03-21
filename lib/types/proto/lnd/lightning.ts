@@ -3692,7 +3692,9 @@ export interface Lightning {
      * map type doesn't appear in the REST API documentation because of a bug in
      * the grpc-gateway library.
      */
-    estimateFee(request?: DeepPartial<EstimateFeeRequest>): Promise<EstimateFeeResponse>;
+    estimateFee(
+        request?: DeepPartial<EstimateFeeRequest>
+    ): Promise<EstimateFeeResponse>;
     /**
      * lncli: `sendcoins`
      * SendCoins executes a request to send coins to a particular address. Unlike
@@ -3701,7 +3703,9 @@ export interface Lightning {
      * consult its fee model to determine a fee for the default confirmation
      * target.
      */
-    sendCoins(request?: DeepPartial<SendCoinsRequest>): Promise<SendCoinsResponse>;
+    sendCoins(
+        request?: DeepPartial<SendCoinsRequest>
+    ): Promise<SendCoinsResponse>;
     /**
      * lncli: `listunspent`
      * Deprecated, use walletrpc.ListUnspent instead.
@@ -3709,15 +3713,19 @@ export interface Lightning {
      * ListUnspent returns a list of all utxos spendable by the wallet with a
      * number of confirmations between the specified minimum and maximum.
      */
-    listUnspent(request?: DeepPartial<ListUnspentRequest>): Promise<ListUnspentResponse>;
+    listUnspent(
+        request?: DeepPartial<ListUnspentRequest>
+    ): Promise<ListUnspentResponse>;
     /**
      * SubscribeTransactions creates a uni-directional stream from the server to
      * the client in which any newly discovered transactions relevant to the
      * wallet are sent over.
      */
     subscribeTransactions(
-        request?: DeepPartial<GetTransactionsRequest>
-    , onMessage?: (msg: Transaction) => void, onError?: (err: Error) => void): void;
+        request?: DeepPartial<GetTransactionsRequest>,
+        onMessage?: (msg: Transaction) => void,
+        onError?: (err: Error) => void
+    ): void;
     /**
      * lncli: `sendmany`
      * SendMany handles a request for a transaction that creates multiple specified
@@ -3730,14 +3738,18 @@ export interface Lightning {
      * lncli: `newaddress`
      * NewAddress creates a new address under control of the local wallet.
      */
-    newAddress(request?: DeepPartial<NewAddressRequest>): Promise<NewAddressResponse>;
+    newAddress(
+        request?: DeepPartial<NewAddressRequest>
+    ): Promise<NewAddressResponse>;
     /**
      * lncli: `signmessage`
      * SignMessage signs a message with this node's private key. The returned
      * signature string is `zbase32` encoded and pubkey recoverable, meaning that
      * only the message digest and signature are needed for verification.
      */
-    signMessage(request?: DeepPartial<SignMessageRequest>): Promise<SignMessageResponse>;
+    signMessage(
+        request?: DeepPartial<SignMessageRequest>
+    ): Promise<SignMessageResponse>;
     /**
      * lncli: `verifymessage`
      * VerifyMessage verifies a signature over a msg. The signature must be
@@ -3754,7 +3766,9 @@ export interface Lightning {
      * the networking level, and is used for communication between nodes. This is
      * distinct from establishing a channel with a peer.
      */
-    connectPeer(request?: DeepPartial<ConnectPeerRequest>): Promise<ConnectPeerResponse>;
+    connectPeer(
+        request?: DeepPartial<ConnectPeerRequest>
+    ): Promise<ConnectPeerResponse>;
     /**
      * lncli: `disconnect`
      * DisconnectPeer attempts to disconnect one peer from another identified by a
@@ -3768,13 +3782,19 @@ export interface Lightning {
      * lncli: `listpeers`
      * ListPeers returns a verbose listing of all currently active peers.
      */
-    listPeers(request?: DeepPartial<ListPeersRequest>): Promise<ListPeersResponse>;
+    listPeers(
+        request?: DeepPartial<ListPeersRequest>
+    ): Promise<ListPeersResponse>;
     /**
      * SubscribePeerEvents creates a uni-directional stream from the server to
      * the client in which any events relevant to the state of peers are sent
      * over. Events include peers going online and offline.
      */
-    subscribePeerEvents(request?: DeepPartial<PeerEventSubscription>, onMessage?: (msg: PeerEvent) => void, onError?: (err: Error) => void): void;
+    subscribePeerEvents(
+        request?: DeepPartial<PeerEventSubscription>,
+        onMessage?: (msg: PeerEvent) => void,
+        onError?: (err: Error) => void
+    ): void;
     /**
      * lncli: `getinfo`
      * GetInfo returns general information concerning the lightning node including
@@ -3806,7 +3826,9 @@ export interface Lightning {
      * ListChannels returns a description of all the open channels that this node
      * is a participant in.
      */
-    listChannels(request?: DeepPartial<ListChannelsRequest>): Promise<ListChannelsResponse>;
+    listChannels(
+        request?: DeepPartial<ListChannelsRequest>
+    ): Promise<ListChannelsResponse>;
     /**
      * SubscribeChannelEvents creates a uni-directional stream from the server to
      * the client in which any updates relevant to the state of the channels are
@@ -3814,8 +3836,10 @@ export interface Lightning {
      * channels.
      */
     subscribeChannelEvents(
-        request?: DeepPartial<ChannelEventSubscription>
-    , onMessage?: (msg: ChannelEventUpdate) => void, onError?: (err: Error) => void): void;
+        request?: DeepPartial<ChannelEventSubscription>,
+        onMessage?: (msg: ChannelEventUpdate) => void,
+        onError?: (err: Error) => void
+    ): void;
     /**
      * lncli: `closedchannels`
      * ClosedChannels returns a description of all the closed channels that
@@ -3830,7 +3854,9 @@ export interface Lightning {
      * other sync calls, all byte slices are intended to be populated as hex
      * encoded strings.
      */
-    openChannelSync(request?: DeepPartial<OpenChannelRequest>): Promise<ChannelPoint>;
+    openChannelSync(
+        request?: DeepPartial<OpenChannelRequest>
+    ): Promise<ChannelPoint>;
     /**
      * lncli: `openchannel`
      * OpenChannel attempts to open a singly funded channel specified in the
@@ -3842,7 +3868,11 @@ export interface Lightning {
      * arguments specified in the OpenChannelRequest, this pending channel ID can
      * then be used to manually progress the channel funding flow.
      */
-    openChannel(request?: DeepPartial<OpenChannelRequest>, onMessage?: (msg: OpenStatusUpdate) => void, onError?: (err: Error) => void): void;
+    openChannel(
+        request?: DeepPartial<OpenChannelRequest>,
+        onMessage?: (msg: OpenStatusUpdate) => void,
+        onError?: (err: Error) => void
+    ): void;
     /**
      * lncli: `batchopenchannel`
      * BatchOpenChannel attempts to open multiple single-funded channels in a
@@ -3875,8 +3905,10 @@ export interface Lightning {
      * through a single persistent connection.
      */
     channelAcceptor(
-        request?: DeepPartial<ChannelAcceptResponse>
-    , onMessage?: (msg: ChannelAcceptRequest) => void, onError?: (err: Error) => void): void;
+        request?: DeepPartial<ChannelAcceptResponse>,
+        onMessage?: (msg: ChannelAcceptRequest) => void,
+        onError?: (err: Error) => void
+    ): void;
     /**
      * lncli: `closechannel`
      * CloseChannel attempts to close an active channel identified by its channel
@@ -3887,7 +3919,11 @@ export interface Lightning {
      * closure transaction is confirmed, or a manual fee rate. If neither are
      * specified, then a default lax, block confirmation target is used.
      */
-    closeChannel(request?: DeepPartial<CloseChannelRequest>, onMessage?: (msg: CloseStatusUpdate) => void, onError?: (err: Error) => void): void;
+    closeChannel(
+        request?: DeepPartial<CloseChannelRequest>,
+        onMessage?: (msg: CloseStatusUpdate) => void,
+        onError?: (err: Error) => void
+    ): void;
     /**
      * lncli: `abandonchannel`
      * AbandonChannel removes all channel state from the database except for a
@@ -3910,7 +3946,11 @@ export interface Lightning {
      *
      * @deprecated
      */
-    sendPayment(request?: DeepPartial<SendRequest>, onMessage?: (msg: SendResponse) => void, onError?: (err: Error) => void): void;
+    sendPayment(
+        request?: DeepPartial<SendRequest>,
+        onMessage?: (msg: SendResponse) => void,
+        onError?: (err: Error) => void
+    ): void;
     /**
      * SendPaymentSync is the synchronous non-streaming version of SendPayment.
      * This RPC is intended to be consumed by clients of the REST proxy.
@@ -3929,13 +3969,17 @@ export interface Lightning {
      * @deprecated
      */
     sendToRoute(
-        request?: DeepPartial<SendToRouteRequest>
-    , onMessage?: (msg: SendResponse) => void, onError?: (err: Error) => void): void;
+        request?: DeepPartial<SendToRouteRequest>,
+        onMessage?: (msg: SendResponse) => void,
+        onError?: (err: Error) => void
+    ): void;
     /**
      * SendToRouteSync is a synchronous version of SendToRoute. It Will block
      * until the payment either fails or succeeds.
      */
-    sendToRouteSync(request?: DeepPartial<SendToRouteRequest>): Promise<SendResponse>;
+    sendToRouteSync(
+        request?: DeepPartial<SendToRouteRequest>
+    ): Promise<SendResponse>;
     /**
      * lncli: `addinvoice`
      * AddInvoice attempts to add a new invoice to the invoice database. Any
@@ -3953,7 +3997,9 @@ export interface Lightning {
      * next request. By default, the first 100 invoices created will be returned.
      * Backwards pagination is also supported through the Reversed flag.
      */
-    listInvoices(request?: DeepPartial<ListInvoiceRequest>): Promise<ListInvoiceResponse>;
+    listInvoices(
+        request?: DeepPartial<ListInvoiceRequest>
+    ): Promise<ListInvoiceResponse>;
     /**
      * lncli: `lookupinvoice`
      * LookupInvoice attempts to look up an invoice according to its payment hash.
@@ -3972,7 +4018,11 @@ export interface Lightning {
      * of these fields can be set. If no fields are set, then we'll only send out
      * the latest add/settle events.
      */
-    subscribeInvoices(request?: DeepPartial<InvoiceSubscription>, onMessage?: (msg: Invoice) => void, onError?: (err: Error) => void): void;
+    subscribeInvoices(
+        request?: DeepPartial<InvoiceSubscription>,
+        onMessage?: (msg: Invoice) => void,
+        onError?: (err: Error) => void
+    ): void;
     /**
      * lncli: `decodepayreq`
      * DecodePayReq takes an encoded payment request string and attempts to decode
@@ -3984,7 +4034,9 @@ export interface Lightning {
      * lncli: `listpayments`
      * ListPayments returns a list of all outgoing payments.
      */
-    listPayments(request?: DeepPartial<ListPaymentsRequest>): Promise<ListPaymentsResponse>;
+    listPayments(
+        request?: DeepPartial<ListPaymentsRequest>
+    ): Promise<ListPaymentsResponse>;
     /**
      * DeletePayment deletes an outgoing payment from DB. Note that it will not
      * attempt to delete an In-Flight payment, since that would be unsafe.
@@ -4008,13 +4060,17 @@ export interface Lightning {
      * the node directional specific routing policy which includes: the time lock
      * delta, fee information, etc.
      */
-    describeGraph(request?: DeepPartial<ChannelGraphRequest>): Promise<ChannelGraph>;
+    describeGraph(
+        request?: DeepPartial<ChannelGraphRequest>
+    ): Promise<ChannelGraph>;
     /**
      * lncli: `getnodemetrics`
      * GetNodeMetrics returns node metrics calculated from the graph. Currently
      * the only supported metric is betweenness centrality of individual nodes.
      */
-    getNodeMetrics(request?: DeepPartial<NodeMetricsRequest>): Promise<NodeMetricsResponse>;
+    getNodeMetrics(
+        request?: DeepPartial<NodeMetricsRequest>
+    ): Promise<NodeMetricsResponse>;
     /**
      * lncli: `getchaninfo`
      * GetChanInfo returns the latest authenticated network announcement for the
@@ -4042,13 +4098,17 @@ export interface Lightning {
      * to the URL. Unfortunately this map type doesn't appear in the REST API
      * documentation because of a bug in the grpc-gateway library.
      */
-    queryRoutes(request?: DeepPartial<QueryRoutesRequest>): Promise<QueryRoutesResponse>;
+    queryRoutes(
+        request?: DeepPartial<QueryRoutesRequest>
+    ): Promise<QueryRoutesResponse>;
     /**
      * lncli: `getnetworkinfo`
      * GetNetworkInfo returns some basic stats about the known channel graph from
      * the point of view of the node.
      */
-    getNetworkInfo(request?: DeepPartial<NetworkInfoRequest>): Promise<NetworkInfo>;
+    getNetworkInfo(
+        request?: DeepPartial<NetworkInfoRequest>
+    ): Promise<NetworkInfo>;
     /**
      * lncli: `stop`
      * StopDaemon will send a shutdown request to the interrupt handler, triggering
@@ -4064,8 +4124,10 @@ export interface Lightning {
      * channel edge, and when channels are closed on-chain.
      */
     subscribeChannelGraph(
-        request?: DeepPartial<GraphTopologySubscription>
-    , onMessage?: (msg: GraphTopologyUpdate) => void, onError?: (err: Error) => void): void;
+        request?: DeepPartial<GraphTopologySubscription>,
+        onMessage?: (msg: GraphTopologyUpdate) => void,
+        onError?: (err: Error) => void
+    ): void;
     /**
      * lncli: `debuglevel`
      * DebugLevel allows a caller to programmatically set the logging verbosity of
@@ -4073,13 +4135,17 @@ export interface Lightning {
      * level, or in a granular fashion to specify the logging for a target
      * sub-system.
      */
-    debugLevel(request?: DeepPartial<DebugLevelRequest>): Promise<DebugLevelResponse>;
+    debugLevel(
+        request?: DeepPartial<DebugLevelRequest>
+    ): Promise<DebugLevelResponse>;
     /**
      * lncli: `feereport`
      * FeeReport allows the caller to obtain a report detailing the current fee
      * schedule enforced by the node globally for each channel.
      */
-    feeReport(request?: DeepPartial<FeeReportRequest>): Promise<FeeReportResponse>;
+    feeReport(
+        request?: DeepPartial<FeeReportRequest>
+    ): Promise<FeeReportResponse>;
     /**
      * lncli: `updatechanpolicy`
      * UpdateChannelPolicy allows the caller to update the fee schedule and
@@ -4155,15 +4221,19 @@ export interface Lightning {
      * channel(s) removed.
      */
     subscribeChannelBackups(
-        request?: DeepPartial<ChannelBackupSubscription>
-    , onMessage?: (msg: ChanBackupSnapshot) => void, onError?: (err: Error) => void): void;
+        request?: DeepPartial<ChannelBackupSubscription>,
+        onMessage?: (msg: ChanBackupSnapshot) => void,
+        onError?: (err: Error) => void
+    ): void;
     /**
      * lncli: `bakemacaroon`
      * BakeMacaroon allows the creation of a new macaroon with custom read and
      * write permissions. No first-party caveats are added since this can be done
      * offline.
      */
-    bakeMacaroon(request?: DeepPartial<BakeMacaroonRequest>): Promise<BakeMacaroonResponse>;
+    bakeMacaroon(
+        request?: DeepPartial<BakeMacaroonRequest>
+    ): Promise<BakeMacaroonResponse>;
     /**
      * lncli: `listmacaroonids`
      * ListMacaroonIDs returns all root key IDs that are in use.
@@ -4210,8 +4280,10 @@ export interface Lightning {
      * modify responses for requests made with _unencumbered_ macaroons!
      */
     registerRPCMiddleware(
-        request?: DeepPartial<RPCMiddlewareResponse>
-    , onMessage?: (msg: RPCMiddlewareRequest) => void, onError?: (err: Error) => void): void;
+        request?: DeepPartial<RPCMiddlewareResponse>,
+        onMessage?: (msg: RPCMiddlewareRequest) => void,
+        onError?: (err: Error) => void
+    ): void;
     /**
      * lncli: `sendcustom`
      * SendCustomMessage sends a custom peer message.
@@ -4225,15 +4297,19 @@ export interface Lightning {
      * messages.
      */
     subscribeCustomMessages(
-        request?: DeepPartial<SubscribeCustomMessagesRequest>
-    , onMessage?: (msg: CustomMessage) => void, onError?: (err: Error) => void): void;
+        request?: DeepPartial<SubscribeCustomMessagesRequest>,
+        onMessage?: (msg: CustomMessage) => void,
+        onError?: (err: Error) => void
+    ): void;
     /**
      * lncli: `listaliases`
      * ListAliases returns the set of all aliases that have ever existed with
      * their confirmed SCID (if it exists) and/or the base SCID (in the case of
      * zero conf).
      */
-    listAliases(request?: DeepPartial<ListAliasesRequest>): Promise<ListAliasesResponse>;
+    listAliases(
+        request?: DeepPartial<ListAliasesRequest>
+    ): Promise<ListAliasesResponse>;
 }
 
 type Builtin =
@@ -4254,4 +4330,3 @@ type DeepPartial<T> = T extends Builtin
     : T extends {}
     ? { [K in keyof T]?: DeepPartial<T[K]> }
     : Partial<T>;
-    

@@ -605,17 +605,27 @@ export interface Router {
      * PaymentRequest to the final destination. The call returns a stream of
      * payment updates.
      */
-    sendPaymentV2(request?: DeepPartial<SendPaymentRequest>, onMessage?: (msg: Payment) => void, onError?: (err: Error) => void): void;
+    sendPaymentV2(
+        request?: DeepPartial<SendPaymentRequest>,
+        onMessage?: (msg: Payment) => void,
+        onError?: (err: Error) => void
+    ): void;
     /**
      * TrackPaymentV2 returns an update stream for the payment identified by the
      * payment hash.
      */
-    trackPaymentV2(request?: DeepPartial<TrackPaymentRequest>, onMessage?: (msg: Payment) => void, onError?: (err: Error) => void): void;
+    trackPaymentV2(
+        request?: DeepPartial<TrackPaymentRequest>,
+        onMessage?: (msg: Payment) => void,
+        onError?: (err: Error) => void
+    ): void;
     /**
      * EstimateRouteFee allows callers to obtain a lower bound w.r.t how much it
      * may cost to send an HTLC to the target end destination.
      */
-    estimateRouteFee(request?: DeepPartial<RouteFeeRequest>): Promise<RouteFeeResponse>;
+    estimateRouteFee(
+        request?: DeepPartial<RouteFeeRequest>
+    ): Promise<RouteFeeResponse>;
     /**
      * Deprecated, use SendToRouteV2. SendToRoute attempts to make a payment via
      * the specified route. This method differs from SendPayment in that it
@@ -625,14 +635,18 @@ export interface Router {
      *
      * @deprecated
      */
-    sendToRoute(request?: DeepPartial<SendToRouteRequest>): Promise<SendToRouteResponse>;
+    sendToRoute(
+        request?: DeepPartial<SendToRouteRequest>
+    ): Promise<SendToRouteResponse>;
     /**
      * SendToRouteV2 attempts to make a payment via the specified route. This
      * method differs from SendPayment in that it allows users to specify a full
      * route manually. This can be used for things like rebalancing, and atomic
      * swaps.
      */
-    sendToRouteV2(request?: DeepPartial<SendToRouteRequest>): Promise<HTLCAttempt>;
+    sendToRouteV2(
+        request?: DeepPartial<SendToRouteRequest>
+    ): Promise<HTLCAttempt>;
     /**
      * ResetMissionControl clears all mission control state and starts with a clean
      * slate.
@@ -679,14 +693,18 @@ export interface Router {
      * keys. It retrieves the relevant channel policies from the graph in order to
      * calculate the correct fees and time locks.
      */
-    buildRoute(request?: DeepPartial<BuildRouteRequest>): Promise<BuildRouteResponse>;
+    buildRoute(
+        request?: DeepPartial<BuildRouteRequest>
+    ): Promise<BuildRouteResponse>;
     /**
      * SubscribeHtlcEvents creates a uni-directional stream from the server to
      * the client which delivers a stream of htlc events.
      */
     subscribeHtlcEvents(
-        request?: DeepPartial<SubscribeHtlcEventsRequest>
-    , onMessage?: (msg: HtlcEvent) => void, onError?: (err: Error) => void): void;
+        request?: DeepPartial<SubscribeHtlcEventsRequest>,
+        onMessage?: (msg: HtlcEvent) => void,
+        onError?: (err: Error) => void
+    ): void;
     /**
      * Deprecated, use SendPaymentV2. SendPayment attempts to route a payment
      * described by the passed PaymentRequest to the final destination. The call
@@ -694,14 +712,22 @@ export interface Router {
      *
      * @deprecated
      */
-    sendPayment(request?: DeepPartial<SendPaymentRequest>, onMessage?: (msg: PaymentStatus) => void, onError?: (err: Error) => void): void;
+    sendPayment(
+        request?: DeepPartial<SendPaymentRequest>,
+        onMessage?: (msg: PaymentStatus) => void,
+        onError?: (err: Error) => void
+    ): void;
     /**
      * Deprecated, use TrackPaymentV2. TrackPayment returns an update stream for
      * the payment identified by the payment hash.
      *
      * @deprecated
      */
-    trackPayment(request?: DeepPartial<TrackPaymentRequest>, onMessage?: (msg: PaymentStatus) => void, onError?: (err: Error) => void): void;
+    trackPayment(
+        request?: DeepPartial<TrackPaymentRequest>,
+        onMessage?: (msg: PaymentStatus) => void,
+        onError?: (err: Error) => void
+    ): void;
     /**
      * HtlcInterceptor dispatches a bi-directional streaming RPC in which
      * Forwarded HTLC requests are sent to the client and the client responds with
@@ -710,8 +736,10 @@ export interface Router {
      * resumed later by using the ResolveHoldForward endpoint.
      */
     htlcInterceptor(
-        request?: DeepPartial<ForwardHtlcInterceptResponse>
-    , onMessage?: (msg: ForwardHtlcInterceptRequest) => void, onError?: (err: Error) => void): void;
+        request?: DeepPartial<ForwardHtlcInterceptResponse>,
+        onMessage?: (msg: ForwardHtlcInterceptRequest) => void,
+        onError?: (err: Error) => void
+    ): void;
     /**
      * UpdateChanStatus attempts to manually set the state of a channel
      * (enabled, disabled, or auto). A manual "disable" request will cause the
@@ -741,4 +769,3 @@ type DeepPartial<T> = T extends Builtin
     : T extends {}
     ? { [K in keyof T]?: DeepPartial<T[K]> }
     : Partial<T>;
-    

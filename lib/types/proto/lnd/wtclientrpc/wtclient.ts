@@ -155,9 +155,13 @@ export interface WatchtowerClient {
      * again. If an address is provided, then this RPC only serves as a way of
      * removing the address from the watchtower instead.
      */
-    removeTower(request?: DeepPartial<RemoveTowerRequest>): Promise<RemoveTowerResponse>;
+    removeTower(
+        request?: DeepPartial<RemoveTowerRequest>
+    ): Promise<RemoveTowerResponse>;
     /** ListTowers returns the list of watchtowers registered with the client. */
-    listTowers(request?: DeepPartial<ListTowersRequest>): Promise<ListTowersResponse>;
+    listTowers(
+        request?: DeepPartial<ListTowersRequest>
+    ): Promise<ListTowersResponse>;
     /** GetTowerInfo retrieves information for a registered watchtower. */
     getTowerInfo(request?: DeepPartial<GetTowerInfoRequest>): Promise<Tower>;
     /** Stats returns the in-memory statistics of the client since startup. */
@@ -184,4 +188,3 @@ type DeepPartial<T> = T extends Builtin
     : T extends {}
     ? { [K in keyof T]?: DeepPartial<T[K]> }
     : Partial<T>;
-    

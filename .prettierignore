@@ -1,6 +1,5 @@
 .github/**
 dist/**
-lib/types/**
 package-lock.json
 package.json
 README.md

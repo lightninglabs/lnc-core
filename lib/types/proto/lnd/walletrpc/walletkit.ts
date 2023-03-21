@@ -598,7 +598,9 @@ export interface WalletKit {
      * default, all utxos are listed. To list only the unconfirmed utxos, set
      * the unconfirmed_only to true.
      */
-    listUnspent(request?: DeepPartial<ListUnspentRequest>): Promise<ListUnspentResponse>;
+    listUnspent(
+        request?: DeepPartial<ListUnspentRequest>
+    ): Promise<ListUnspentResponse>;
     /**
      * LeaseOutput locks an output to the given ID, preventing it from being
      * available for any future coin selection attempts. The absolute time of the
@@ -606,7 +608,9 @@ export interface WalletKit {
      * successive invocations of this RPC. Outputs can be unlocked before their
      * expiration through `ReleaseOutput`.
      */
-    leaseOutput(request?: DeepPartial<LeaseOutputRequest>): Promise<LeaseOutputResponse>;
+    leaseOutput(
+        request?: DeepPartial<LeaseOutputRequest>
+    ): Promise<LeaseOutputResponse>;
     /**
      * ReleaseOutput unlocks an output, allowing it to be available for coin
      * selection if it remains unspent. The ID should match the one used to
@@ -616,7 +620,9 @@ export interface WalletKit {
         request?: DeepPartial<ReleaseOutputRequest>
     ): Promise<ReleaseOutputResponse>;
     /** ListLeases lists all currently locked utxos. */
-    listLeases(request?: DeepPartial<ListLeasesRequest>): Promise<ListLeasesResponse>;
+    listLeases(
+        request?: DeepPartial<ListLeasesRequest>
+    ): Promise<ListLeasesResponse>;
     /**
      * DeriveNextKey attempts to derive the *next* key within the key family
      * (account in BIP43) specified. This method should return the next external
@@ -635,7 +641,9 @@ export interface WalletKit {
      * name and key scope filter can be provided to filter through all of the
      * wallet accounts and return only those matching.
      */
-    listAccounts(request?: DeepPartial<ListAccountsRequest>): Promise<ListAccountsResponse>;
+    listAccounts(
+        request?: DeepPartial<ListAccountsRequest>
+    ): Promise<ListAccountsResponse>;
     /**
      * RequiredReserve returns the minimum amount of satoshis that should be kept
      * in the wallet in order to fee bump anchor channels if necessary. The value
@@ -688,19 +696,25 @@ export interface WalletKit {
      * attempt to re-broadcast the transaction on start up, until it enters the
      * chain.
      */
-    publishTransaction(request?: DeepPartial<Transaction>): Promise<PublishResponse>;
+    publishTransaction(
+        request?: DeepPartial<Transaction>
+    ): Promise<PublishResponse>;
     /**
      * SendOutputs is similar to the existing sendmany call in Bitcoind, and
      * allows the caller to create a transaction that sends to several outputs at
      * once. This is ideal when wanting to batch create a set of transactions.
      */
-    sendOutputs(request?: DeepPartial<SendOutputsRequest>): Promise<SendOutputsResponse>;
+    sendOutputs(
+        request?: DeepPartial<SendOutputsRequest>
+    ): Promise<SendOutputsResponse>;
     /**
      * EstimateFee attempts to query the internal fee estimator of the wallet to
      * determine the fee (in sat/kw) to attach to a transaction in order to
      * achieve the confirmation target.
      */
-    estimateFee(request?: DeepPartial<EstimateFeeRequest>): Promise<EstimateFeeResponse>;
+    estimateFee(
+        request?: DeepPartial<EstimateFeeRequest>
+    ): Promise<EstimateFeeResponse>;
     /**
      * PendingSweeps returns lists of on-chain outputs that lnd is currently
      * attempting to sweep within its central batching engine. Outputs with similar
@@ -747,7 +761,9 @@ export interface WalletKit {
      * Note that these sweeps may not be confirmed yet, as we record sweeps on
      * broadcast, not confirmation.
      */
-    listSweeps(request?: DeepPartial<ListSweepsRequest>): Promise<ListSweepsResponse>;
+    listSweeps(
+        request?: DeepPartial<ListSweepsRequest>
+    ): Promise<ListSweepsResponse>;
     /**
      * LabelTransaction adds a label to a transaction. If the transaction already
      * has a label the call will fail unless the overwrite bool is set. This will
@@ -805,7 +821,9 @@ export interface WalletKit {
      * caller's responsibility to either publish the transaction on success or
      * unlock/release any locked UTXOs in case of an error in this method.
      */
-    finalizePsbt(request?: DeepPartial<FinalizePsbtRequest>): Promise<FinalizePsbtResponse>;
+    finalizePsbt(
+        request?: DeepPartial<FinalizePsbtRequest>
+    ): Promise<FinalizePsbtResponse>;
 }
 
 type Builtin =
@@ -826,4 +844,3 @@ type DeepPartial<T> = T extends Builtin
     : T extends {}
     ? { [K in keyof T]?: DeepPartial<T[K]> }
     : Partial<T>;
-    

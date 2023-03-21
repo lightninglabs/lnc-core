@@ -273,13 +273,17 @@ export interface WalletUnlocker {
      * seed, then present it to the user. Once it has been verified by the user,
      * the seed can be fed into this RPC in order to commit the new wallet.
      */
-    initWallet(request?: DeepPartial<InitWalletRequest>): Promise<InitWalletResponse>;
+    initWallet(
+        request?: DeepPartial<InitWalletRequest>
+    ): Promise<InitWalletResponse>;
     /**
      * lncli: `unlock`
      * UnlockWallet is used at startup of lnd to provide a password to unlock
      * the wallet database.
      */
-    unlockWallet(request?: DeepPartial<UnlockWalletRequest>): Promise<UnlockWalletResponse>;
+    unlockWallet(
+        request?: DeepPartial<UnlockWalletRequest>
+    ): Promise<UnlockWalletResponse>;
     /**
      * lncli: `changepassword`
      * ChangePassword changes the password of the encrypted wallet. This will
@@ -308,4 +312,3 @@ type DeepPartial<T> = T extends Builtin
     : T extends {}
     ? { [K in keyof T]?: DeepPartial<T[K]> }
     : Partial<T>;
-    

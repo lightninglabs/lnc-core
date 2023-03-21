@@ -749,13 +749,19 @@ export interface SwapClient {
      * loop: `monitor`
      * Monitor will return a stream of swap updates for currently active swaps.
      */
-    monitor(request?: DeepPartial<MonitorRequest>, onMessage?: (msg: SwapStatus) => void, onError?: (err: Error) => void): void;
+    monitor(
+        request?: DeepPartial<MonitorRequest>,
+        onMessage?: (msg: SwapStatus) => void,
+        onError?: (err: Error) => void
+    ): void;
     /**
      * loop: `listswaps`
      * ListSwaps returns a list of all currently known swaps and their current
      * status.
      */
-    listSwaps(request?: DeepPartial<ListSwapsRequest>): Promise<ListSwapsResponse>;
+    listSwaps(
+        request?: DeepPartial<ListSwapsRequest>
+    ): Promise<ListSwapsResponse>;
     /**
      * loop: `swapinfo`
      * SwapInfo returns all known details about a single swap.
@@ -765,23 +771,31 @@ export interface SwapClient {
      * loop: `terms`
      * LoopOutTerms returns the terms that the server enforces for a loop out swap.
      */
-    loopOutTerms(request?: DeepPartial<TermsRequest>): Promise<OutTermsResponse>;
+    loopOutTerms(
+        request?: DeepPartial<TermsRequest>
+    ): Promise<OutTermsResponse>;
     /**
      * loop: `quote`
      * LoopOutQuote returns a quote for a loop out swap with the provided
      * parameters.
      */
-    loopOutQuote(request?: DeepPartial<QuoteRequest>): Promise<OutQuoteResponse>;
+    loopOutQuote(
+        request?: DeepPartial<QuoteRequest>
+    ): Promise<OutQuoteResponse>;
     /**
      * loop: `terms`
      * GetTerms returns the terms that the server enforces for swaps.
      */
-    getLoopInTerms(request?: DeepPartial<TermsRequest>): Promise<InTermsResponse>;
+    getLoopInTerms(
+        request?: DeepPartial<TermsRequest>
+    ): Promise<InTermsResponse>;
     /**
      * loop: `quote`
      * GetQuote returns a quote for a swap with the provided parameters.
      */
-    getLoopInQuote(request?: DeepPartial<QuoteRequest>): Promise<InQuoteResponse>;
+    getLoopInQuote(
+        request?: DeepPartial<QuoteRequest>
+    ): Promise<InQuoteResponse>;
     /**
      * Probe asks he sever to probe the route to us to have a better upfront
      * estimate about routing fees when loopin-in.
@@ -791,7 +805,9 @@ export interface SwapClient {
      * loop: `listauth`
      * GetLsatTokens returns all LSAT tokens the daemon ever paid for.
      */
-    getLsatTokens(request?: DeepPartial<TokensRequest>): Promise<TokensResponse>;
+    getLsatTokens(
+        request?: DeepPartial<TokensRequest>
+    ): Promise<TokensResponse>;
     /**
      * loop: `getparams`
      * GetLiquidityParams gets the parameters that the daemon's liquidity manager
@@ -818,7 +834,9 @@ export interface SwapClient {
      * Note that only loop out suggestions are currently supported.
      * [EXPERIMENTAL]: endpoint is subject to change.
      */
-    suggestSwaps(request?: DeepPartial<SuggestSwapsRequest>): Promise<SuggestSwapsResponse>;
+    suggestSwaps(
+        request?: DeepPartial<SuggestSwapsRequest>
+    ): Promise<SuggestSwapsResponse>;
 }
 
 type Builtin =
@@ -839,4 +857,3 @@ type DeepPartial<T> = T extends Builtin
     : T extends {}
     ? { [K in keyof T]?: DeepPartial<T[K]> }
     : Partial<T>;
-    

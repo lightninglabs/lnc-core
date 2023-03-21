@@ -1035,13 +1035,17 @@ export interface Trader {
      * pool: `stop`
      * Stop gracefully shuts down the Pool trader daemon.
      */
-    stopDaemon(request?: DeepPartial<StopDaemonRequest>): Promise<StopDaemonResponse>;
+    stopDaemon(
+        request?: DeepPartial<StopDaemonRequest>
+    ): Promise<StopDaemonResponse>;
     /**
      * QuoteAccount gets a fee quote to fund an account of the given size with the
      * given confirmation target. If the connected lnd wallet doesn't have enough
      * balance to fund an account of the requested size, an error is returned.
      */
-    quoteAccount(request?: DeepPartial<QuoteAccountRequest>): Promise<QuoteAccountResponse>;
+    quoteAccount(
+        request?: DeepPartial<QuoteAccountRequest>
+    ): Promise<QuoteAccountResponse>;
     /**
      * pool: `accounts new`
      * InitAccount creates a new account with the requested size and expiration,
@@ -1053,13 +1057,17 @@ export interface Trader {
      * ListAccounts returns a list of all accounts known to the trader daemon and
      * their current state.
      */
-    listAccounts(request?: DeepPartial<ListAccountsRequest>): Promise<ListAccountsResponse>;
+    listAccounts(
+        request?: DeepPartial<ListAccountsRequest>
+    ): Promise<ListAccountsResponse>;
     /**
      * pool: `accounts close`
      * CloseAccount closes an account and returns the funds locked in that account
      * to the connected lnd node's wallet.
      */
-    closeAccount(request?: DeepPartial<CloseAccountRequest>): Promise<CloseAccountResponse>;
+    closeAccount(
+        request?: DeepPartial<CloseAccountRequest>
+    ): Promise<CloseAccountResponse>;
     /**
      * pool: `accounts withdraw`
      * WithdrawAccount splits off parts of the account balance into the specified
@@ -1080,7 +1088,9 @@ export interface Trader {
      * pool: `accounts renew`
      * RenewAccount renews the expiration of an account.
      */
-    renewAccount(request?: DeepPartial<RenewAccountRequest>): Promise<RenewAccountResponse>;
+    renewAccount(
+        request?: DeepPartial<RenewAccountRequest>
+    ): Promise<RenewAccountResponse>;
     /**
      * pool: `accounts bumpfee`
      * BumpAccountFee attempts to bump the fee of an account's transaction through
@@ -1106,30 +1116,40 @@ export interface Trader {
      * SubmitOrder creates a new ask or bid order and submits for the given account
      * and submits it to the auction server for matching.
      */
-    submitOrder(request?: DeepPartial<SubmitOrderRequest>): Promise<SubmitOrderResponse>;
+    submitOrder(
+        request?: DeepPartial<SubmitOrderRequest>
+    ): Promise<SubmitOrderResponse>;
     /**
      * pool: `orders list`
      * ListOrders returns a list of all active and archived orders that are
      * currently known to the trader daemon.
      */
-    listOrders(request?: DeepPartial<ListOrdersRequest>): Promise<ListOrdersResponse>;
+    listOrders(
+        request?: DeepPartial<ListOrdersRequest>
+    ): Promise<ListOrdersResponse>;
     /**
      * pool: `orders cancel`
      * CancelOrder cancels an active order with the auction server to remove it
      * from future matching.
      */
-    cancelOrder(request?: DeepPartial<CancelOrderRequest>): Promise<CancelOrderResponse>;
+    cancelOrder(
+        request?: DeepPartial<CancelOrderRequest>
+    ): Promise<CancelOrderResponse>;
     /**
      * QuoteOrder calculates the premium, execution fees and max batch fee rate for
      * an order based on the given order parameters.
      */
-    quoteOrder(request?: DeepPartial<QuoteOrderRequest>): Promise<QuoteOrderResponse>;
+    quoteOrder(
+        request?: DeepPartial<QuoteOrderRequest>
+    ): Promise<QuoteOrderResponse>;
     /**
      * pool: `auction fee`
      * AuctionFee returns the current auction order execution fee specified by the
      * auction server.
      */
-    auctionFee(request?: DeepPartial<AuctionFeeRequest>): Promise<AuctionFeeResponse>;
+    auctionFee(
+        request?: DeepPartial<AuctionFeeRequest>
+    ): Promise<AuctionFeeResponse>;
     /**
      * pool: `auction leasedurations`
      * LeaseDurations returns the current set of valid lease duration in the
@@ -1159,7 +1179,9 @@ export interface Trader {
      * pool: `listauth`
      * GetLsatTokens returns all LSAT tokens the daemon ever paid for.
      */
-    getLsatTokens(request?: DeepPartial<TokensRequest>): Promise<TokensResponse>;
+    getLsatTokens(
+        request?: DeepPartial<TokensRequest>
+    ): Promise<TokensResponse>;
     /**
      * pool: `auction leases`
      * Leases returns the list of channels that were either purchased or sold by
@@ -1171,7 +1193,9 @@ export interface Trader {
      * Returns the Node Tier information for this target Lightning node, and other
      * related ranking information.
      */
-    nodeRatings(request?: DeepPartial<NodeRatingRequest>): Promise<NodeRatingResponse>;
+    nodeRatings(
+        request?: DeepPartial<NodeRatingRequest>
+    ): Promise<NodeRatingResponse>;
     /**
      * pool: `auction snapshot`
      * BatchSnapshots returns a list of batch snapshots starting at the start batch
@@ -1193,7 +1217,9 @@ export interface Trader {
      * signed with the provider's lnd node public key. The ticket returned by this
      * call will have the state "offered".
      */
-    offerSidecar(request?: DeepPartial<OfferSidecarRequest>): Promise<SidecarTicket>;
+    offerSidecar(
+        request?: DeepPartial<OfferSidecarRequest>
+    ): Promise<SidecarTicket>;
     /**
      * pool: `sidecar register`
      * RegisterSidecarRequest is step 2/4 of the sidecar negotiation between the
@@ -1203,7 +1229,9 @@ export interface Trader {
      * the recipient's node information and channel funding multisig pubkey filled
      * in. The ticket returned by this call will have the state "registered".
      */
-    registerSidecar(request?: DeepPartial<RegisterSidecarRequest>): Promise<SidecarTicket>;
+    registerSidecar(
+        request?: DeepPartial<RegisterSidecarRequest>
+    ): Promise<SidecarTicket>;
     /**
      * pool: `sidecar expectchannel`
      * ExpectSidecarChannel is step 4/4 of the sidecar negotiation between the
@@ -1222,14 +1250,18 @@ export interface Trader {
      * Decodes the base58 encoded sidecar ticket into its individual data fields
      * for a more human-readable representation.
      */
-    decodeSidecarTicket(request?: DeepPartial<SidecarTicket>): Promise<DecodedSidecarTicket>;
+    decodeSidecarTicket(
+        request?: DeepPartial<SidecarTicket>
+    ): Promise<DecodedSidecarTicket>;
     /**
      * pool: `sidecar list`
      * ListSidecars lists all sidecar tickets currently in the local database. This
      * includes tickets offered by our node as well as tickets that our node is the
      * recipient of. Optionally a ticket ID can be provided to filter the tickets.
      */
-    listSidecars(request?: DeepPartial<ListSidecarsRequest>): Promise<ListSidecarsResponse>;
+    listSidecars(
+        request?: DeepPartial<ListSidecarsRequest>
+    ): Promise<ListSidecarsResponse>;
     /**
      * pool: `sidecar cancel`
      * CancelSidecar cancels the execution of a specific sidecar ticket. Depending
@@ -1259,4 +1291,3 @@ type DeepPartial<T> = T extends Builtin
     : T extends {}
     ? { [K in keyof T]?: DeepPartial<T[K]> }
     : Partial<T>;
-    
