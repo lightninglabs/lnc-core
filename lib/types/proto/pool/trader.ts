@@ -22,7 +22,8 @@ export enum AccountVersion {
     /**
      * ACCOUNT_VERSION_LND_DEPENDENT - Let the version of lnd decide. If a version of lnd >= 0.15.0-beta is
      * detected then a Taproot account is created. For earlier versions a legacy
-     * account is created.
+     * account is created. If a version of lnd >= 0.16.0-beta is detected, then a
+     * Taproot v2 account is created.
      */
     ACCOUNT_VERSION_LND_DEPENDENT = 'ACCOUNT_VERSION_LND_DEPENDENT',
     /** ACCOUNT_VERSION_LEGACY - A legacy SegWit v0 p2wsh account with a single script. */
@@ -32,6 +33,13 @@ export enum AccountVersion {
      * script as a single tap script leaf.
      */
     ACCOUNT_VERSION_TAPROOT = 'ACCOUNT_VERSION_TAPROOT',
+    /**
+     * ACCOUNT_VERSION_TAPROOT_V2 - A Taproot enabled account with MuSig2 combined internal key and the expiry
+     * script as a single tap script leaf. This version uses the MuSig2 v1.0.0-rc2
+     * protocol for creating the combined internal key. This can only be selected
+     * when the connected lnd version is >= 0.16.0-beta.
+     */
+    ACCOUNT_VERSION_TAPROOT_V2 = 'ACCOUNT_VERSION_TAPROOT_V2',
     UNRECOGNIZED = 'UNRECOGNIZED'
 }
 
@@ -658,6 +666,42 @@ export interface RecoverAccountsResponse {
     numRecoveredAccounts: number;
 }
 
+export interface AccountModificationFeesRequest {}
+
+export interface AccountModificationFee {
+    /** Modification action type. */
+    action: string;
+    /** Transaction ID. */
+    txid: string;
+    /** Action transaction block height. */
+    blockHeight: number;
+    /** Action transaction timestamp. */
+    timestamp: string;
+    /** Action transaction output amount. */
+    outputAmount: string;
+    /**
+     * A flag which is true if fee value has not been set, and is otherwise
+     * false.
+     */
+    feeNull: boolean | undefined;
+    /** Action transaction fee value. */
+    feeValue: string | undefined;
+}
+
+export interface ListOfAccountModificationFees {
+    modificationFees: AccountModificationFee[];
+}
+
+export interface AccountModificationFeesResponse {
+    /** A map from account key to an ordered list of account modification fees. */
+    accounts: { [key: string]: ListOfAccountModificationFees };
+}
+
+export interface AccountModificationFeesResponse_AccountsEntry {
+    key: string;
+    value: ListOfAccountModificationFees | undefined;
+}
+
 export interface AuctionFeeRequest {}
 
 export interface AuctionFeeResponse {
@@ -1111,6 +1155,14 @@ export interface Trader {
     recoverAccounts(
         request?: DeepPartial<RecoverAccountsRequest>
     ): Promise<RecoverAccountsResponse>;
+    /**
+     * pool: `accounts listfees`
+     * AccountModificationFees returns a map from account key to an ordered list of
+     * account action modification fees.
+     */
+    accountModificationFees(
+        request?: DeepPartial<AccountModificationFeesRequest>
+    ): Promise<AccountModificationFeesResponse>;
     /**
      * pool: `orders submit`
      * SubmitOrder creates a new ask or bid order and submits for the given account
