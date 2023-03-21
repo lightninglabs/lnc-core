@@ -56,6 +56,7 @@ export const subscriptionMethods = [
     'lnrpc.Lightning.SubscribeCustomMessages',
     'routerrpc.Router.SendPaymentV2',
     'routerrpc.Router.TrackPaymentV2',
+    'routerrpc.Router.TrackPayments',
     'routerrpc.Router.SubscribeHtlcEvents',
     'routerrpc.Router.SendPayment',
     'routerrpc.Router.TrackPayment',

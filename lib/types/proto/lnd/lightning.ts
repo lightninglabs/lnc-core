@@ -190,6 +190,18 @@ export enum UpdateFailure {
     UNRECOGNIZED = 'UNRECOGNIZED'
 }
 
+export interface LookupHtlcResolutionRequest {
+    chanId: string;
+    htlcIndex: string;
+}
+
+export interface LookupHtlcResolutionResponse {
+    /** Settled is true is the htlc was settled. If false, the htlc was failed. */
+    settled: boolean;
+    /** Offchain indicates whether the htlc was resolved off-chain or on-chain. */
+    offchain: boolean;
+}
+
 export interface SubscribeCustomMessagesRequest {}
 
 export interface CustomMessage {
@@ -204,7 +216,12 @@ export interface CustomMessage {
 export interface SendCustomMessageRequest {
     /** Peer to send the message to */
     peer: Uint8Array | string;
-    /** Message type. This value needs to be in the custom range (>= 32768). */
+    /**
+     * Message type. This value needs to be in the custom range (>= 32768).
+     * To send a type < custom range, lnd needs to be compiled with the `dev`
+     * build tag, and the message type to override should be specified in lnd's
+     * experimental protocol configuration.
+     */
     type: number;
     /** Raw message data. */
     data: Uint8Array | string;
@@ -974,6 +991,8 @@ export interface Channel {
     zeroConf: boolean;
     /** This is the confirmed / on-chain zero-conf SCID. */
     zeroConfConfirmedScid: string;
+    /** The configured alias name of our peer. */
+    peerAlias: string;
 }
 
 export interface ListChannelsRequest {
@@ -986,6 +1005,12 @@ export interface ListChannelsRequest {
      * empty, all channels will be returned.
      */
     peer: Uint8Array | string;
+    /**
+     * Informs the server if the peer alias lookup per channel should be
+     * enabled. It is turned off by default in order to avoid degradation of
+     * performance for existing clients.
+     */
+    peerAliasLookup: boolean;
 }
 
 export interface ListChannelsResponse {
@@ -1239,6 +1264,8 @@ export interface GetInfoResponse {
     features: { [key: number]: Feature };
     /** Indicates whether the HTLC interceptor API is in always-on mode. */
     requireHtlcInterceptor: boolean;
+    /** Indicates whether final htlc resolutions are stored on disk. */
+    storeFinalHtlcResolutions: boolean;
 }
 
 export interface GetInfoResponse_FeaturesEntry {
@@ -1546,6 +1573,33 @@ export interface OpenChannelRequest {
      * attempted.
      */
     scidAlias: boolean;
+    /** The base fee charged regardless of the number of milli-satoshis sent. */
+    baseFee: string;
+    /**
+     * The fee rate in ppm (parts per million) that will be charged in
+     * proportion of the value of each forwarded HTLC.
+     */
+    feeRate: string;
+    /**
+     * If use_base_fee is true the open channel announcement will update the
+     * channel base fee with the value specified in base_fee. In the case of
+     * a base_fee of 0 use_base_fee is needed downstream to distinguish whether
+     * to use the default base fee value specified in the config or 0.
+     */
+    useBaseFee: boolean;
+    /**
+     * If use_fee_rate is true the open channel announcement will update the
+     * channel fee rate with the value specified in fee_rate. In the case of
+     * a fee_rate of 0 use_fee_rate is needed downstream to distinguish whether
+     * to use the default fee rate value specified in the config or 0.
+     */
+    useFeeRate: boolean;
+    /**
+     * The number of satoshis we require the remote peer to reserve. This value,
+     * if specified, must be above the dust limit and below 20% of the channel
+     * capacity.
+     */
+    remoteChanReserveSat: string;
 }
 
 export interface OpenStatusUpdate {
@@ -1877,9 +1931,17 @@ export interface PendingChannelsResponse_ForceClosedChannel {
     anchor: PendingChannelsResponse_ForceClosedChannel_AnchorState;
 }
 
+/**
+ * There are three resolution states for the anchor:
+ * limbo, lost and recovered. Derive the current state
+ * from the limbo and recovered balances.
+ */
 export enum PendingChannelsResponse_ForceClosedChannel_AnchorState {
+    /** LIMBO - The recovered_balance is zero and limbo_balance is non-zero. */
     LIMBO = 'LIMBO',
+    /** RECOVERED - The recovered_balance is non-zero. */
     RECOVERED = 'RECOVERED',
+    /** LOST - A state that is neither LIMBO nor RECOVERED. */
     LOST = 'LOST',
     UNRECOGNIZED = 'UNRECOGNIZED'
 }
@@ -2270,11 +2332,18 @@ export interface LightningNode {
     addresses: NodeAddress[];
     color: string;
     features: { [key: number]: Feature };
+    /** Custom node announcement tlv records. */
+    customRecords: { [key: string]: Uint8Array | string };
 }
 
 export interface LightningNode_FeaturesEntry {
     key: number;
     value: Feature | undefined;
+}
+
+export interface LightningNode_CustomRecordsEntry {
+    key: string;
+    value: Uint8Array | string;
 }
 
 export interface NodeAddress {
@@ -2290,6 +2359,13 @@ export interface RoutingPolicy {
     disabled: boolean;
     maxHtlcMsat: string;
     lastUpdate: number;
+    /** Custom channel update tlv records. */
+    customRecords: { [key: string]: Uint8Array | string };
+}
+
+export interface RoutingPolicy_CustomRecordsEntry {
+    key: string;
+    value: Uint8Array | string;
 }
 
 /**
@@ -2314,6 +2390,13 @@ export interface ChannelEdge {
     capacity: string;
     node1Policy: RoutingPolicy | undefined;
     node2Policy: RoutingPolicy | undefined;
+    /** Custom channel announcement tlv records. */
+    customRecords: { [key: string]: Uint8Array | string };
+}
+
+export interface ChannelEdge_CustomRecordsEntry {
+    key: string;
+    value: Uint8Array | string;
 }
 
 export interface ChannelGraphRequest {
@@ -2526,7 +2609,7 @@ export interface Invoice {
      */
     valueMsat: string;
     /**
-     * Whether this invoice has been fulfilled
+     * Whether this invoice has been fulfilled.
      *
      * The field is deprecated. Use the state field instead (compare to SETTLED).
      *
@@ -2535,11 +2618,13 @@ export interface Invoice {
     settled: boolean;
     /**
      * When this invoice was created.
+     * Measured in seconds since the unix epoch.
      * Note: Output only, don't specify for creating an invoice.
      */
     creationDate: string;
     /**
      * When this invoice was settled.
+     * Measured in seconds since the unix epoch.
      * Note: Output only, don't specify for creating an invoice.
      */
     settleDate: string;
@@ -2557,7 +2642,7 @@ export interface Invoice {
      * as base64.
      */
     descriptionHash: Uint8Array | string;
-    /** Payment request expiry time in seconds. Default is 3600 (1 hour). */
+    /** Payment request expiry time in seconds. Default is 86400 (24 hours). */
     expiry: string;
     /** Fallback on-chain address. */
     fallbackAddr: string;
@@ -2568,7 +2653,11 @@ export interface Invoice {
      * invoice's destination.
      */
     routeHints: RouteHint[];
-    /** Whether this invoice should include routing hints for private channels. */
+    /**
+     * Whether this invoice should include routing hints for private channels.
+     * Note: When enabled, if value and value_msat are zero, a large number of
+     * hints with these channels can be included, which might not be desirable.
+     */
     private: boolean;
     /**
      * The "add" index of this invoice. Each newly created invoice will increment
@@ -2785,6 +2874,16 @@ export interface ListInvoiceRequest {
      * specified index offset. This can be used to paginate backwards.
      */
     reversed: boolean;
+    /**
+     * If set, returns all invoices with a creation date greater than or equal
+     * to it. Measured in seconds since the unix epoch.
+     */
+    creationDateStart: string;
+    /**
+     * If set, returns all invoices with a creation date less than or equal to
+     * it. Measured in seconds since the unix epoch.
+     */
+    creationDateEnd: string;
 }
 
 export interface ListInvoiceResponse {
@@ -2936,6 +3035,16 @@ export interface ListPaymentsRequest {
      * of payments, as all of them have to be iterated through to be counted.
      */
     countTotalPayments: boolean;
+    /**
+     * If set, returns all invoices with a creation date greater than or equal
+     * to it. Measured in seconds since the unix epoch.
+     */
+    creationDateStart: string;
+    /**
+     * If set, returns all invoices with a creation date less than or equal to
+     * it. Measured in seconds since the unix epoch.
+     */
+    creationDateEnd: string;
 }
 
 export interface ListPaymentsResponse {
@@ -3141,6 +3250,11 @@ export interface ForwardingHistoryRequest {
     indexOffset: number;
     /** The max number of events to return in the response to this query. */
     numMaxEvents: number;
+    /**
+     * Informs the server if the peer alias should be looked up for each
+     * forwarding event.
+     */
+    peerAliasLookup: boolean;
 }
 
 export interface ForwardingEvent {
@@ -3187,6 +3301,10 @@ export interface ForwardingEvent {
      * circuit was completed.
      */
     timestampNs: string;
+    /** The peer alias of the incoming channel. */
+    peerAliasIn: string;
+    /** The peer alias of the outgoing channel. */
+    peerAliasOut: string;
 }
 
 export interface ForwardingHistoryResponse {
@@ -4295,6 +4413,10 @@ export interface Lightning {
      * lncli: `subscribecustom`
      * SubscribeCustomMessages subscribes to a stream of incoming custom peer
      * messages.
+     *
+     * To include messages with type outside of the custom range (>= 32768) lnd
+     * needs to be compiled with  the `dev` build tag, and the message type to
+     * override should be specified in lnd's experimental protocol configuration.
      */
     subscribeCustomMessages(
         request?: DeepPartial<SubscribeCustomMessagesRequest>,
@@ -4310,6 +4432,14 @@ export interface Lightning {
     listAliases(
         request?: DeepPartial<ListAliasesRequest>
     ): Promise<ListAliasesResponse>;
+    /**
+     * LookupHtlcResolution retrieves a final htlc resolution from the database.
+     * If the htlc has no final resolution yet, a NotFound grpc status code is
+     * returned.
+     */
+    lookupHtlcResolution(
+        request?: DeepPartial<LookupHtlcResolutionRequest>
+    ): Promise<LookupHtlcResolutionResponse>;
 }
 
 type Builtin =

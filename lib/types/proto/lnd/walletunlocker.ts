@@ -109,6 +109,12 @@ export interface InitWalletRequest {
      * corresponding private keys and can serve signing RPC requests.
      */
     watchOnly: WatchOnly | undefined;
+    /**
+     * macaroon_root_key is an optional 32 byte macaroon root key that can be
+     * provided when initializing the wallet rather than letting lnd generate one
+     * on its own.
+     */
+    macaroonRootKey: Uint8Array | string;
 }
 
 export interface InitWalletResponse {

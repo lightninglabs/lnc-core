@@ -57,7 +57,7 @@ export interface AddHoldInvoiceRequest {
      * of an encoded payment request.
      */
     descriptionHash: Uint8Array | string;
-    /** Payment request expiry time in seconds. Default is 3600 (1 hour). */
+    /** Payment request expiry time in seconds. Default is 86400 (24 hours). */
     expiry: string;
     /** Fallback on-chain address. */
     fallbackAddr: string;

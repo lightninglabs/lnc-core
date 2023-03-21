@@ -5,7 +5,7 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "config": {
-    "lnd_release_tag": "v0.15.5-beta",
+    "lnd_release_tag": "v0.16.0-beta",
     "loop_release_tag": "v0.21.0-beta",
     "pool_release_tag": "v0.6.1-beta",
     "faraday_release_tag": "v0.2.9-alpha",

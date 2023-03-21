@@ -215,6 +215,14 @@ export interface TrackPaymentRequest {
     noInflightUpdates: boolean;
 }
 
+export interface TrackPaymentsRequest {
+    /**
+     * If set, only the final payment updates are streamed back. Intermediate
+     * updates that show which htlcs are still in flight are suppressed.
+     */
+    noInflightUpdates: boolean;
+}
+
 export interface RouteFeeRequest {
     /** The destination once wishes to obtain a routing fee quote to. */
     dest: Uint8Array | string;
@@ -331,6 +339,85 @@ export interface SetMissionControlConfigResponse {}
 
 export interface MissionControlConfig {
     /**
+     * Deprecated, use AprioriParameters. The amount of time mission control will
+     * take to restore a penalized node or channel back to 50% success probability,
+     * expressed in seconds. Setting this value to a higher value will penalize
+     * failures for longer, making mission control less likely to route through
+     * nodes and channels that we have previously recorded failures for.
+     *
+     * @deprecated
+     */
+    halfLifeSeconds: string;
+    /**
+     * Deprecated, use AprioriParameters. The probability of success mission
+     * control should assign to hop in a route where it has no other information
+     * available. Higher values will make mission control more willing to try hops
+     * that we have no information about, lower values will discourage trying these
+     * hops.
+     *
+     * @deprecated
+     */
+    hopProbability: number;
+    /**
+     * Deprecated, use AprioriParameters. The importance that mission control
+     * should place on historical results, expressed as a value in [0;1]. Setting
+     * this value to 1 will ignore all historical payments and just use the hop
+     * probability to assess the probability of success for each hop. A zero value
+     * ignores hop probability completely and relies entirely on historical
+     * results, unless none are available.
+     *
+     * @deprecated
+     */
+    weight: number;
+    /** The maximum number of payment results that mission control will store. */
+    maximumPaymentResults: number;
+    /**
+     * The minimum time that must have passed since the previously recorded failure
+     * before we raise the failure amount.
+     */
+    minimumFailureRelaxInterval: string;
+    /**
+     * ProbabilityModel defines which probability estimator should be used in
+     * pathfinding. Note that the bimodal estimator is experimental.
+     */
+    model: MissionControlConfig_ProbabilityModel;
+    apriori: AprioriParameters | undefined;
+    bimodal: BimodalParameters | undefined;
+}
+
+export enum MissionControlConfig_ProbabilityModel {
+    APRIORI = 'APRIORI',
+    BIMODAL = 'BIMODAL',
+    UNRECOGNIZED = 'UNRECOGNIZED'
+}
+
+export interface BimodalParameters {
+    /**
+     * NodeWeight defines how strongly other previous forwardings on channels of a
+     * router should be taken into account when computing a channel's probability
+     * to route. The allowed values are in the range [0, 1], where a value of 0
+     * means that only direct information about a channel is taken into account.
+     */
+    nodeWeight: number;
+    /**
+     * ScaleMsat describes the scale over which channels statistically have some
+     * liquidity left. The value determines how quickly the bimodal distribution
+     * drops off from the edges of a channel. A larger value (compared to typical
+     * channel capacities) means that the drop off is slow and that channel
+     * balances are distributed more uniformly. A small value leads to the
+     * assumption of very unbalanced channels.
+     */
+    scaleMsat: string;
+    /**
+     * DecayTime describes the information decay of knowledge about previous
+     * successes and failures in channels. The smaller the decay time, the quicker
+     * we forget about past forwardings.
+     */
+    decayTime: string;
+}
+
+export interface AprioriParameters {
+    /**
      * The amount of time mission control will take to restore a penalized node
      * or channel back to 50% success probability, expressed in seconds. Setting
      * this value to a higher value will penalize failures for longer, making
@@ -354,13 +441,13 @@ export interface MissionControlConfig {
      * available.
      */
     weight: number;
-    /** The maximum number of payment results that mission control will store. */
-    maximumPaymentResults: number;
     /**
-     * The minimum time that must have passed since the previously recorded failure
-     * before we raise the failure amount.
+     * The fraction of a channel's capacity that we consider to have liquidity. For
+     * amounts that come close to or exceed the fraction, an additional penalty is
+     * applied. A value of 1.0 disables the capacity factor. Allowed values are in
+     * [0.75, 1.0].
      */
-    minimumFailureRelaxInterval: string;
+    capacityFraction: number;
 }
 
 export interface QueryProbabilityRequest {
@@ -451,6 +538,8 @@ export interface HtlcEvent {
     forwardFailEvent: ForwardFailEvent | undefined;
     settleEvent: SettleEvent | undefined;
     linkFailEvent: LinkFailEvent | undefined;
+    subscribedEvent: SubscribedEvent | undefined;
+    finalHtlcEvent: FinalHtlcEvent | undefined;
 }
 
 export enum HtlcEvent_EventType {
@@ -483,6 +572,13 @@ export interface SettleEvent {
     /** The revealed preimage. */
     preimage: Uint8Array | string;
 }
+
+export interface FinalHtlcEvent {
+    settled: boolean;
+    offchain: boolean;
+}
+
+export interface SubscribedEvent {}
 
 export interface LinkFailEvent {
     /** Info contains details about the htlc that we failed. */
@@ -545,6 +641,11 @@ export interface ForwardHtlcInterceptRequest {
     customRecords: { [key: string]: Uint8Array | string };
     /** The onion blob for the next hop */
     onionBlob: Uint8Array | string;
+    /**
+     * The block height at which this htlc will be auto-failed to prevent the
+     * channel from force-closing.
+     */
+    autoFailHeight: number;
 }
 
 export interface ForwardHtlcInterceptRequest_CustomRecordsEntry {
@@ -620,6 +721,19 @@ export interface Router {
         onError?: (err: Error) => void
     ): void;
     /**
+     * TrackPayments returns an update stream for every payment that is not in a
+     * terminal state. Note that if payments are in-flight while starting a new
+     * subscription, the start of the payment stream could produce out-of-order
+     * and/or duplicate events. In order to get updates for every in-flight
+     * payment attempt make sure to subscribe to this method before initiating any
+     * payments.
+     */
+    trackPayments(
+        request?: DeepPartial<TrackPaymentsRequest>,
+        onMessage?: (msg: Payment) => void,
+        onError?: (err: Error) => void
+    ): void;
+    /**
      * EstimateRouteFee allows callers to obtain a lower bound w.r.t how much it
      * may cost to send an HTLC to the target end destination.
      */
@@ -682,8 +796,10 @@ export interface Router {
         request?: DeepPartial<SetMissionControlConfigRequest>
     ): Promise<SetMissionControlConfigResponse>;
     /**
-     * QueryProbability returns the current success probability estimate for a
-     * given node pair and amount.
+     * Deprecated. QueryProbability returns the current success probability
+     * estimate for a given node pair and amount. The call returns a zero success
+     * probability if no channel is available or if the amount violates min/max
+     * HTLC constraints.
      */
     queryProbability(
         request?: DeepPartial<QueryProbabilityRequest>

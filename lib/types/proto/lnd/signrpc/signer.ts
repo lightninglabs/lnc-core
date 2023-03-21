@@ -23,6 +23,26 @@ export enum SignMethod {
     UNRECOGNIZED = 'UNRECOGNIZED'
 }
 
+export enum MuSig2Version {
+    /**
+     * MUSIG2_VERSION_UNDEFINED - The default value on the RPC is zero for enums so we need to represent an
+     * invalid/undefined version by default to make sure clients upgrade their
+     * software to set the version explicitly.
+     */
+    MUSIG2_VERSION_UNDEFINED = 'MUSIG2_VERSION_UNDEFINED',
+    /**
+     * MUSIG2_VERSION_V040 - The version of MuSig2 that lnd 0.15.x shipped with, which corresponds to the
+     * version v0.4.0 of the MuSig2 BIP draft.
+     */
+    MUSIG2_VERSION_V040 = 'MUSIG2_VERSION_V040',
+    /**
+     * MUSIG2_VERSION_V100RC2 - The current version of MuSig2 which corresponds to the version v1.0.0rc2 of
+     * the MuSig2 BIP draft.
+     */
+    MUSIG2_VERSION_V100RC2 = 'MUSIG2_VERSION_V100RC2',
+    UNRECOGNIZED = 'UNRECOGNIZED'
+}
+
 export interface KeyLocator {
     /** The family of key being identified. */
     keyFamily: number;
@@ -267,10 +287,10 @@ export interface TaprootTweakDesc {
 
 export interface MuSig2CombineKeysRequest {
     /**
-     * A list of all public keys (serialized in 32-byte x-only format!)
-     * participating in the signing session. The list will always be sorted
-     * lexicographically internally. This must include the local key which is
-     * described by the above key_loc.
+     * A list of all public keys (serialized in 32-byte x-only format for v0.4.0
+     * and 33-byte compressed format for v1.0.0rc2!) participating in the signing
+     * session. The list will always be sorted lexicographically internally. This
+     * must include the local key which is described by the above key_loc.
      */
     allSignerPubkeys: Uint8Array | string[];
     /**
@@ -284,6 +304,13 @@ export interface MuSig2CombineKeysRequest {
      * on-chain.
      */
     taprootTweak: TaprootTweakDesc | undefined;
+    /**
+     * The mandatory version of the MuSig2 BIP draft to use. This is necessary to
+     * differentiate between the changes that were made to the BIP while this
+     * experimental RPC was already released. Some of those changes affect how the
+     * combined key and nonces are created.
+     */
+    version: MuSig2Version;
 }
 
 export interface MuSig2CombineKeysResponse {
@@ -300,16 +327,18 @@ export interface MuSig2CombineKeysResponse {
      * is used.
      */
     taprootInternalKey: Uint8Array | string;
+    /** The version of the MuSig2 BIP that was used to combine the keys. */
+    version: MuSig2Version;
 }
 
 export interface MuSig2SessionRequest {
     /** The key locator that identifies which key to use for signing. */
     keyLoc: KeyLocator | undefined;
     /**
-     * A list of all public keys (serialized in 32-byte x-only format!)
-     * participating in the signing session. The list will always be sorted
-     * lexicographically internally. This must include the local key which is
-     * described by the above key_loc.
+     * A list of all public keys (serialized in 32-byte x-only format for v0.4.0
+     * and 33-byte compressed format for v1.0.0rc2!) participating in the signing
+     * session. The list will always be sorted lexicographically internally. This
+     * must include the local key which is described by the above key_loc.
      */
     allSignerPubkeys: Uint8Array | string[];
     /**
@@ -328,6 +357,13 @@ export interface MuSig2SessionRequest {
      * on-chain.
      */
     taprootTweak: TaprootTweakDesc | undefined;
+    /**
+     * The mandatory version of the MuSig2 BIP draft to use. This is necessary to
+     * differentiate between the changes that were made to the BIP while this
+     * experimental RPC was already released. Some of those changes affect how the
+     * combined key and nonces are created.
+     */
+    version: MuSig2Version;
 }
 
 export interface MuSig2SessionResponse {
@@ -361,6 +397,8 @@ export interface MuSig2SessionResponse {
      * now.
      */
     haveAllNonces: boolean;
+    /** The version of the MuSig2 BIP that was used to create the session. */
+    version: MuSig2Version;
 }
 
 export interface MuSig2RegisterNoncesRequest {

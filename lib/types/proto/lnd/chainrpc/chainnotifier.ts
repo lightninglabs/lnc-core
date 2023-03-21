@@ -25,6 +25,11 @@ export interface ConfRequest {
      * broadcast height of the transaction/output script.
      */
     heightHint: number;
+    /**
+     * If true, then the block that mines the specified txid/script will be
+     * included in eventual the notification event.
+     */
+    includeBlock: boolean;
 }
 
 export interface ConfDetails {
@@ -37,8 +42,13 @@ export interface ConfDetails {
      * in.
      */
     blockHeight: number;
-    /** The index of the confirmed transaction within the transaction. */
+    /** The index of the confirmed transaction within the block. */
     txIndex: number;
+    /**
+     * The raw bytes of the block that mined the transaction. Only included if
+     * include_block was set in the request.
+     */
+    rawBlock: Uint8Array | string;
 }
 
 /** TODO(wilmer): need to know how the client will use this first. */
