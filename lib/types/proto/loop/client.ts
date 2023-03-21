@@ -625,10 +625,13 @@ export interface LiquidityParameters {
      */
     autoloopBudgetSat: string;
     /**
-     * The start time for autoloop budget, expressed as a unix timestamp in
-     * seconds. If this value is 0, the budget will be applied for all
-     * automatically dispatched swaps. Swaps that were completed before this date
-     * will not be included in budget calculations.
+     * Deprecated, use autoloop_budget_refresh_period_sec. The start time for
+     * autoloop budget, expressed as a unix timestamp in seconds. If this value is
+     * 0, the budget will be applied for all automatically dispatched swaps. Swaps
+     * that were completed before this date will not be included in budget
+     * calculations.
+     *
+     * @deprecated
      */
     autoloopBudgetStartSec: string;
     /**
@@ -655,6 +658,16 @@ export interface LiquidityParameters {
      * order to revert to default behavior.
      */
     autoloopDestAddress: string;
+    /**
+     * The period over which the autoloop budget is refreshed, expressed in
+     * seconds.
+     */
+    autoloopBudgetRefreshPeriodSec: string;
+    /**
+     * The time at which the autoloop budget was last refreshed, expressed as a
+     * UNIX timestamp in seconds.
+     */
+    autoloopBudgetLastRefresh: string;
 }
 
 export interface LiquidityRule {
