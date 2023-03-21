@@ -70,6 +70,10 @@ export interface ListAutopilotFeaturesResponse_FeaturesEntry {
 }
 
 export interface RevokeAutopilotSessionRequest {
+    /**
+     * The local static public key of the Autopilot session to be revoked.
+     * When using REST, this field must be encoded as base64url.
+     */
     localPublicKey: Uint8Array | string;
 }
 
@@ -123,15 +127,35 @@ export interface Permissions {
 }
 
 export interface Autopilot {
+    /**
+     * litcli: `autopilot features`
+     * ListAutopilotFeatures fetches all the features supported by the Autopilot
+     * server along with the rules that we need to support in order to subscribe
+     * to those features.
+     */
     listAutopilotFeatures(
         request?: DeepPartial<ListAutopilotFeaturesRequest>
     ): Promise<ListAutopilotFeaturesResponse>;
+    /**
+     * litcli: `autopilot add`
+     * AddAutopilotSession creates a new LNC session and attempts to register it
+     * with the Autopilot server.
+     */
     addAutopilotSession(
         request?: DeepPartial<AddAutopilotSessionRequest>
     ): Promise<AddAutopilotSessionResponse>;
+    /**
+     * litcli: `autopilot list`
+     * ListAutopilotSessions lists all the sessions that are of type
+     * TypeAutopilot.
+     */
     listAutopilotSessions(
         request?: DeepPartial<ListAutopilotSessionsRequest>
     ): Promise<ListAutopilotSessionsResponse>;
+    /**
+     * litcli: `autopilot revoke`
+     * RevokeAutopilotSession revokes an Autopilot session.
+     */
     revokeAutopilotSession(
         request?: DeepPartial<RevokeAutopilotSessionRequest>
     ): Promise<RevokeAutopilotSessionResponse>;
