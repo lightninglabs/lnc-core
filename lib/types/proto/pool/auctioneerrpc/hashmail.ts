@@ -80,7 +80,9 @@ export interface HashMail {
      * authentication mechanism used to initially create the stream MUST be
      * specified.
      */
-    delCipherBox(request?: DeepPartial<CipherBoxAuth>): Promise<DelCipherBoxResp>;
+    delCipherBox(
+        request?: DeepPartial<CipherBoxAuth>
+    ): Promise<DelCipherBoxResp>;
     /**
      * SendStream opens up the write side of the passed CipherBox pipe. Writes
      * will be non-blocking up to the buffer size of the pipe. Beyond that writes
@@ -92,7 +94,11 @@ export interface HashMail {
      * will block until a full message has been read as this is a message based
      * pipe/stream abstraction.
      */
-    recvStream(request?: DeepPartial<CipherBoxDesc>, onMessage?: (msg: CipherBox) => void, onError?: (err: Error) => void): void;
+    recvStream(
+        request?: DeepPartial<CipherBoxDesc>,
+        onMessage?: (msg: CipherBox) => void,
+        onError?: (err: Error) => void
+    ): void;
 }
 
 type Builtin =
@@ -113,4 +119,3 @@ type DeepPartial<T> = T extends Builtin
     : T extends {}
     ? { [K in keyof T]?: DeepPartial<T[K]> }
     : Partial<T>;
-    

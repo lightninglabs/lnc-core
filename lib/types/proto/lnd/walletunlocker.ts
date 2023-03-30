@@ -109,6 +109,12 @@ export interface InitWalletRequest {
      * corresponding private keys and can serve signing RPC requests.
      */
     watchOnly: WatchOnly | undefined;
+    /**
+     * macaroon_root_key is an optional 32 byte macaroon root key that can be
+     * provided when initializing the wallet rather than letting lnd generate one
+     * on its own.
+     */
+    macaroonRootKey: Uint8Array | string;
 }
 
 export interface InitWalletResponse {
@@ -273,13 +279,17 @@ export interface WalletUnlocker {
      * seed, then present it to the user. Once it has been verified by the user,
      * the seed can be fed into this RPC in order to commit the new wallet.
      */
-    initWallet(request?: DeepPartial<InitWalletRequest>): Promise<InitWalletResponse>;
+    initWallet(
+        request?: DeepPartial<InitWalletRequest>
+    ): Promise<InitWalletResponse>;
     /**
      * lncli: `unlock`
      * UnlockWallet is used at startup of lnd to provide a password to unlock
      * the wallet database.
      */
-    unlockWallet(request?: DeepPartial<UnlockWalletRequest>): Promise<UnlockWalletResponse>;
+    unlockWallet(
+        request?: DeepPartial<UnlockWalletRequest>
+    ): Promise<UnlockWalletResponse>;
     /**
      * lncli: `changepassword`
      * ChangePassword changes the password of the encrypted wallet. This will
@@ -308,4 +318,3 @@ type DeepPartial<T> = T extends Builtin
     : T extends {}
     ? { [K in keyof T]?: DeepPartial<T[K]> }
     : Partial<T>;
-    

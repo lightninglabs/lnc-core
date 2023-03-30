@@ -25,6 +25,11 @@ export interface ConfRequest {
      * broadcast height of the transaction/output script.
      */
     heightHint: number;
+    /**
+     * If true, then the block that mines the specified txid/script will be
+     * included in eventual the notification event.
+     */
+    includeBlock: boolean;
 }
 
 export interface ConfDetails {
@@ -37,8 +42,13 @@ export interface ConfDetails {
      * in.
      */
     blockHeight: number;
-    /** The index of the confirmed transaction within the transaction. */
+    /** The index of the confirmed transaction within the block. */
     txIndex: number;
+    /**
+     * The raw bytes of the block that mined the transaction. Only included if
+     * include_block was set in the request.
+     */
+    rawBlock: Uint8Array | string;
 }
 
 /** TODO(wilmer): need to know how the client will use this first. */
@@ -138,7 +148,11 @@ export interface ChainNotifier {
      * a notification is sent once the output script confirms in the given
      * transaction.
      */
-    registerConfirmationsNtfn(request?: DeepPartial<ConfRequest>, onMessage?: (msg: ConfEvent) => void, onError?: (err: Error) => void): void;
+    registerConfirmationsNtfn(
+        request?: DeepPartial<ConfRequest>,
+        onMessage?: (msg: ConfEvent) => void,
+        onError?: (err: Error) => void
+    ): void;
     /**
      * RegisterSpendNtfn is a synchronous response-streaming RPC that registers an
      * intent for a client to be notification once a spend request has been spent
@@ -147,7 +161,11 @@ export interface ChainNotifier {
      * A client can specify whether the spend request should be for a particular
      * outpoint  or for an output script by specifying a zero outpoint.
      */
-    registerSpendNtfn(request?: DeepPartial<SpendRequest>, onMessage?: (msg: SpendEvent) => void, onError?: (err: Error) => void): void;
+    registerSpendNtfn(
+        request?: DeepPartial<SpendRequest>,
+        onMessage?: (msg: SpendEvent) => void,
+        onError?: (err: Error) => void
+    ): void;
     /**
      * RegisterBlockEpochNtfn is a synchronous response-streaming RPC that
      * registers an intent for a client to be notified of blocks in the chain. The
@@ -159,7 +177,11 @@ export interface ChainNotifier {
      * point. This allows clients to be idempotent by ensuring that they do not
      * missing processing a single block within the chain.
      */
-    registerBlockEpochNtfn(request?: DeepPartial<BlockEpoch>, onMessage?: (msg: BlockEpoch) => void, onError?: (err: Error) => void): void;
+    registerBlockEpochNtfn(
+        request?: DeepPartial<BlockEpoch>,
+        onMessage?: (msg: BlockEpoch) => void,
+        onError?: (err: Error) => void
+    ): void;
 }
 
 type Builtin =
@@ -180,4 +202,3 @@ type DeepPartial<T> = T extends Builtin
     : T extends {}
     ? { [K in keyof T]?: DeepPartial<T[K]> }
     : Partial<T>;
-    

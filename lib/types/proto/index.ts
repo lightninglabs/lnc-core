@@ -11,4 +11,18 @@ import * as watchtowerrpc from './watchtowerrpc';
 import * as wtclientrpc from './wtclientrpc';
 import * as looprpc from './looprpc';
 import * as poolrpc from './poolrpc';
-export { frdrpc, litrpc, autopilotrpc, chainrpc, invoicesrpc, lnrpc, routerrpc, signrpc, walletrpc, watchtowerrpc, wtclientrpc, looprpc, poolrpc };
+export {
+    frdrpc,
+    litrpc,
+    autopilotrpc,
+    chainrpc,
+    invoicesrpc,
+    lnrpc,
+    routerrpc,
+    signrpc,
+    walletrpc,
+    watchtowerrpc,
+    wtclientrpc,
+    looprpc,
+    poolrpc
+};

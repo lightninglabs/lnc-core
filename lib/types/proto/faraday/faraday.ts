@@ -508,21 +508,27 @@ export interface FaradayServer {
      * Example request:
      * http://localhost:8466/v1/faraday/exchangerate
      */
-    exchangeRate(request?: DeepPartial<ExchangeRateRequest>): Promise<ExchangeRateResponse>;
+    exchangeRate(
+        request?: DeepPartial<ExchangeRateRequest>
+    ): Promise<ExchangeRateResponse>;
     /**
      * Get a report of your node's activity over a period.
      *
      * Example request:
      * http://localhost:8466/v1/faraday/nodeaudit
      */
-    nodeAudit(request?: DeepPartial<NodeAuditRequest>): Promise<NodeAuditResponse>;
+    nodeAudit(
+        request?: DeepPartial<NodeAuditRequest>
+    ): Promise<NodeAuditResponse>;
     /**
      * Get a channel close report for a specific channel.
      *
      * Example request:
      * http://localhost:8466/v1/faraday/closereport
      */
-    closeReport(request?: DeepPartial<CloseReportRequest>): Promise<CloseReportResponse>;
+    closeReport(
+        request?: DeepPartial<CloseReportRequest>
+    ): Promise<CloseReportResponse>;
 }
 
 type Builtin =
@@ -543,4 +549,3 @@ type DeepPartial<T> = T extends Builtin
     : T extends {}
     ? { [K in keyof T]?: DeepPartial<T[K]> }
     : Partial<T>;
-    

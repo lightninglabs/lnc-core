@@ -62,18 +62,24 @@ export interface Autopilot {
      * ModifyStatus is used to modify the status of the autopilot agent, like
      * enabling or disabling it.
      */
-    modifyStatus(request?: DeepPartial<ModifyStatusRequest>): Promise<ModifyStatusResponse>;
+    modifyStatus(
+        request?: DeepPartial<ModifyStatusRequest>
+    ): Promise<ModifyStatusResponse>;
     /**
      * QueryScores queries all available autopilot heuristics, in addition to any
      * active combination of these heruristics, for the scores they would give to
      * the given nodes.
      */
-    queryScores(request?: DeepPartial<QueryScoresRequest>): Promise<QueryScoresResponse>;
+    queryScores(
+        request?: DeepPartial<QueryScoresRequest>
+    ): Promise<QueryScoresResponse>;
     /**
      * SetScores attempts to set the scores used by the running autopilot agent,
      * if the external scoring heuristic is enabled.
      */
-    setScores(request?: DeepPartial<SetScoresRequest>): Promise<SetScoresResponse>;
+    setScores(
+        request?: DeepPartial<SetScoresRequest>
+    ): Promise<SetScoresResponse>;
 }
 
 type Builtin =
@@ -94,4 +100,3 @@ type DeepPartial<T> = T extends Builtin
     : T extends {}
     ? { [K in keyof T]?: DeepPartial<T[K]> }
     : Partial<T>;
-    

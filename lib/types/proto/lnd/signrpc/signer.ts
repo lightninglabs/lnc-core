@@ -23,6 +23,26 @@ export enum SignMethod {
     UNRECOGNIZED = 'UNRECOGNIZED'
 }
 
+export enum MuSig2Version {
+    /**
+     * MUSIG2_VERSION_UNDEFINED - The default value on the RPC is zero for enums so we need to represent an
+     * invalid/undefined version by default to make sure clients upgrade their
+     * software to set the version explicitly.
+     */
+    MUSIG2_VERSION_UNDEFINED = 'MUSIG2_VERSION_UNDEFINED',
+    /**
+     * MUSIG2_VERSION_V040 - The version of MuSig2 that lnd 0.15.x shipped with, which corresponds to the
+     * version v0.4.0 of the MuSig2 BIP draft.
+     */
+    MUSIG2_VERSION_V040 = 'MUSIG2_VERSION_V040',
+    /**
+     * MUSIG2_VERSION_V100RC2 - The current version of MuSig2 which corresponds to the version v1.0.0rc2 of
+     * the MuSig2 BIP draft.
+     */
+    MUSIG2_VERSION_V100RC2 = 'MUSIG2_VERSION_V100RC2',
+    UNRECOGNIZED = 'UNRECOGNIZED'
+}
+
 export interface KeyLocator {
     /** The family of key being identified. */
     keyFamily: number;
@@ -267,10 +287,10 @@ export interface TaprootTweakDesc {
 
 export interface MuSig2CombineKeysRequest {
     /**
-     * A list of all public keys (serialized in 32-byte x-only format!)
-     * participating in the signing session. The list will always be sorted
-     * lexicographically internally. This must include the local key which is
-     * described by the above key_loc.
+     * A list of all public keys (serialized in 32-byte x-only format for v0.4.0
+     * and 33-byte compressed format for v1.0.0rc2!) participating in the signing
+     * session. The list will always be sorted lexicographically internally. This
+     * must include the local key which is described by the above key_loc.
      */
     allSignerPubkeys: Uint8Array | string[];
     /**
@@ -284,6 +304,13 @@ export interface MuSig2CombineKeysRequest {
      * on-chain.
      */
     taprootTweak: TaprootTweakDesc | undefined;
+    /**
+     * The mandatory version of the MuSig2 BIP draft to use. This is necessary to
+     * differentiate between the changes that were made to the BIP while this
+     * experimental RPC was already released. Some of those changes affect how the
+     * combined key and nonces are created.
+     */
+    version: MuSig2Version;
 }
 
 export interface MuSig2CombineKeysResponse {
@@ -300,16 +327,18 @@ export interface MuSig2CombineKeysResponse {
      * is used.
      */
     taprootInternalKey: Uint8Array | string;
+    /** The version of the MuSig2 BIP that was used to combine the keys. */
+    version: MuSig2Version;
 }
 
 export interface MuSig2SessionRequest {
     /** The key locator that identifies which key to use for signing. */
     keyLoc: KeyLocator | undefined;
     /**
-     * A list of all public keys (serialized in 32-byte x-only format!)
-     * participating in the signing session. The list will always be sorted
-     * lexicographically internally. This must include the local key which is
-     * described by the above key_loc.
+     * A list of all public keys (serialized in 32-byte x-only format for v0.4.0
+     * and 33-byte compressed format for v1.0.0rc2!) participating in the signing
+     * session. The list will always be sorted lexicographically internally. This
+     * must include the local key which is described by the above key_loc.
      */
     allSignerPubkeys: Uint8Array | string[];
     /**
@@ -328,6 +357,13 @@ export interface MuSig2SessionRequest {
      * on-chain.
      */
     taprootTweak: TaprootTweakDesc | undefined;
+    /**
+     * The mandatory version of the MuSig2 BIP draft to use. This is necessary to
+     * differentiate between the changes that were made to the BIP while this
+     * experimental RPC was already released. Some of those changes affect how the
+     * combined key and nonces are created.
+     */
+    version: MuSig2Version;
 }
 
 export interface MuSig2SessionResponse {
@@ -361,6 +397,8 @@ export interface MuSig2SessionResponse {
      * now.
      */
     haveAllNonces: boolean;
+    /** The version of the MuSig2 BIP that was used to create the session. */
+    version: MuSig2Version;
 }
 
 export interface MuSig2RegisterNoncesRequest {
@@ -455,7 +493,9 @@ export interface Signer {
      * in the TxOut field, the value in that same field, and finally the input
      * index.
      */
-    computeInputScript(request?: DeepPartial<SignReq>): Promise<InputScriptResp>;
+    computeInputScript(
+        request?: DeepPartial<SignReq>
+    ): Promise<InputScriptResp>;
     /**
      * SignMessage signs a message with the key specified in the key locator. The
      * returned signature is fixed-size LN wire format encoded.
@@ -463,7 +503,9 @@ export interface Signer {
      * The main difference to SignMessage in the main RPC is that a specific key is
      * used to sign the message instead of the node identity private key.
      */
-    signMessage(request?: DeepPartial<SignMessageReq>): Promise<SignMessageResp>;
+    signMessage(
+        request?: DeepPartial<SignMessageReq>
+    ): Promise<SignMessageResp>;
     /**
      * VerifyMessage verifies a signature over a message using the public key
      * provided. The signature must be fixed-size LN wire format encoded.
@@ -471,7 +513,9 @@ export interface Signer {
      * The main difference to VerifyMessage in the main RPC is that the public key
      * used to sign the message does not have to be a node known to the network.
      */
-    verifyMessage(request?: DeepPartial<VerifyMessageReq>): Promise<VerifyMessageResp>;
+    verifyMessage(
+        request?: DeepPartial<VerifyMessageReq>
+    ): Promise<VerifyMessageResp>;
     /**
      * DeriveSharedKey returns a shared secret key by performing Diffie-Hellman key
      * derivation between the ephemeral public key in the request and the node's
@@ -482,7 +526,9 @@ export interface Signer {
      * The resulting shared public key is serialized in the compressed format and
      * hashed with sha256, resulting in the final key length of 256bit.
      */
-    deriveSharedKey(request?: DeepPartial<SharedKeyRequest>): Promise<SharedKeyResponse>;
+    deriveSharedKey(
+        request?: DeepPartial<SharedKeyRequest>
+    ): Promise<SharedKeyResponse>;
     /**
      * MuSig2CombineKeys (experimental!) is a stateless helper RPC that can be used
      * to calculate the combined MuSig2 public key from a list of all participating
@@ -538,7 +584,9 @@ export interface Signer {
      * considered to be HIGHLY EXPERIMENTAL and subject to change in upcoming
      * releases. Backward compatibility is not guaranteed!
      */
-    muSig2Sign(request?: DeepPartial<MuSig2SignRequest>): Promise<MuSig2SignResponse>;
+    muSig2Sign(
+        request?: DeepPartial<MuSig2SignRequest>
+    ): Promise<MuSig2SignResponse>;
     /**
      * MuSig2CombineSig (experimental!) combines the given partial signature(s)
      * with the local one, if it already exists. Once a partial signature of all
@@ -584,4 +632,3 @@ type DeepPartial<T> = T extends Builtin
     : T extends {}
     ? { [K in keyof T]?: DeepPartial<T[K]> }
     : Partial<T>;
-    
