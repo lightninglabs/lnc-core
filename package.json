@@ -1,6 +1,6 @@
 {
   "name": "@lightninglabs/lnc-core",
-  "version": "0.2.3-alpha",
+  "version": "0.2.4-alpha",
   "description": "Type definitions and utilities for Lightning Node Connect",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
