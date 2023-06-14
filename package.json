@@ -9,13 +9,14 @@
     "loop_release_tag": "v0.22.0-beta",
     "pool_release_tag": "v0.6.2-beta",
     "faraday_release_tag": "v0.2.9-alpha",
+    "tapd_release_tag": "v0.2.0-lit-0",
     "lit_release_tag": "v0.9.0-alpha",
     "protoc_version": "21.9"
   },
   "scripts": {
     "build": "NODE_ENV=production webpack",
     "dev": "webpack --watch --stats-error-details",
-    "update-protos": "sh scripts/update_protos.sh  ${npm_package_config_lnd_release_tag} ${npm_package_config_loop_release_tag} ${npm_package_config_pool_release_tag} ${npm_package_config_faraday_release_tag} ${npm_package_config_lit_release_tag}",
+    "update-protos": "sh scripts/update_protos.sh ${npm_package_config_lnd_release_tag} ${npm_package_config_loop_release_tag} ${npm_package_config_pool_release_tag} ${npm_package_config_faraday_release_tag} ${npm_package_config_tapd_release_tag} ${npm_package_config_lit_release_tag}",
     "generate": "sh scripts/generate_types.sh ${npm_package_config_lnd_release_tag} ${npm_package_config_loop_release_tag} ${npm_package_config_pool_release_tag} ${npm_package_config_faraday_release_tag} ${npm_package_config_lit_release_tag} ${npm_package_config_protoc_version}",
     "prettier": "prettier --check '**/*.ts*'",
     "prettier-write": "prettier --check --write '**/*.ts*'",
