@@ -11,6 +11,10 @@ import * as watchtowerrpc from './watchtowerrpc';
 import * as wtclientrpc from './wtclientrpc';
 import * as looprpc from './looprpc';
 import * as poolrpc from './poolrpc';
+import * as assetwalletrpc from './assetwalletrpc';
+import * as mintrpc from './mintrpc';
+import * as taprpc from './taprpc';
+import * as universerpc from './universerpc';
 export {
     frdrpc,
     litrpc,
@@ -24,5 +28,9 @@ export {
     watchtowerrpc,
     wtclientrpc,
     looprpc,
-    poolrpc
+    poolrpc,
+    assetwalletrpc,
+    mintrpc,
+    taprpc,
+    universerpc
 };
