@@ -8,7 +8,8 @@ export const serviceNames = {
     litrpc: {
         Firewall: 'litrpc.Firewall',
         Autopilot: 'litrpc.Autopilot',
-        Sessions: 'litrpc.Sessions'
+        Sessions: 'litrpc.Sessions',
+        Status: 'litrpc.Status'
     },
     autopilotrpc: { Autopilot: 'autopilotrpc.Autopilot' },
     chainrpc: { ChainNotifier: 'chainrpc.ChainNotifier' },
