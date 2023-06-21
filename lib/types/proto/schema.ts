@@ -27,7 +27,11 @@ export const serviceNames = {
         ChannelAuctioneer: 'poolrpc.ChannelAuctioneer',
         HashMail: 'poolrpc.HashMail',
         Trader: 'poolrpc.Trader'
-    }
+    },
+    assetwalletrpc: { AssetWallet: 'assetwalletrpc.AssetWallet' },
+    mintrpc: { Mint: 'mintrpc.Mint' },
+    taprpc: { TaprootAssets: 'taprpc.TaprootAssets' },
+    universerpc: { Universe: 'universerpc.Universe' }
 };
 
 // This array contains the list of methods that are server streaming. It is
@@ -64,5 +68,6 @@ export const subscriptionMethods = [
     'looprpc.SwapClient.Monitor',
     'poolrpc.ChannelAuctioneer.SubscribeBatchAuction',
     'poolrpc.ChannelAuctioneer.SubscribeSidecar',
-    'poolrpc.HashMail.RecvStream'
+    'poolrpc.HashMail.RecvStream',
+    'taprpc.TaprootAssets.SubscribeSendAssetEventNtfns'
 ];

@@ -2,12 +2,14 @@ LND_RELEASE_TAG=$1
 LOOP_RELEASE_TAG=$2
 POOL_RELEASE_TAG=$3
 FARADAY_RELEASE_TAG=$4
-LIT_RELEASE_TAG=$5
+TAPD_RELEASE_TAG=$5
+LIT_RELEASE_TAG=$6
 
 echo "LND release tag:" $LND_RELEASE_TAG
 echo "Loop release tag:" $LOOP_RELEASE_TAG
 echo "Pool release tag:" $POOL_RELEASE_TAG
 echo "Faraday release tag:" $FARADAY_RELEASE_TAG
+echo "Taproot Assets release tag:" $TAPD_RELEASE_TAG
 echo "LiT release tag:" $LIT_RELEASE_TAG
 
 # RPC Servers
@@ -15,6 +17,7 @@ LND_URL="https://raw.githubusercontent.com/lightningnetwork/lnd"
 LOOP_URL="https://raw.githubusercontent.com/lightninglabs/loop"
 POOL_URL="https://raw.githubusercontent.com/lightninglabs/pool"
 FARADAY_URL="https://raw.githubusercontent.com/lightninglabs/faraday"
+TAPD_URL="https://raw.githubusercontent.com/lightninglabs/taproot-assets"
 LIT_URL="https://raw.githubusercontent.com/lightninglabs/lightning-terminal"
 
 curl ${LND_URL}/${LND_RELEASE_TAG}/lnrpc/lightning.proto --create-dirs -o protos/lnd/${LND_RELEASE_TAG}/lightning.proto
@@ -38,6 +41,11 @@ curl ${POOL_URL}/${POOL_RELEASE_TAG}/auctioneerrpc/auctioneer.proto --create-dir
 curl ${POOL_URL}/${POOL_RELEASE_TAG}/auctioneerrpc/hashmail.proto --create-dirs -o protos/pool/${POOL_RELEASE_TAG}/auctioneerrpc/hashmail.proto
 
 curl ${FARADAY_URL}/${FARADAY_RELEASE_TAG}/frdrpc/faraday.proto --create-dirs -o protos/faraday/${FARADAY_RELEASE_TAG}/faraday.proto
+
+curl ${TAPD_URL}/${TAPD_RELEASE_TAG}/taprpc/taprootassets.proto --create-dirs -o protos/tapd/${TAPD_RELEASE_TAG}/taprootassets.proto
+curl ${TAPD_URL}/${TAPD_RELEASE_TAG}/taprpc/assetwalletrpc/assetwallet.proto --create-dirs -o protos/tapd/${TAPD_RELEASE_TAG}/assetwalletrpc/assetwallet.proto
+curl ${TAPD_URL}/${TAPD_RELEASE_TAG}/taprpc/mintrpc/mint.proto --create-dirs -o protos/tapd/${TAPD_RELEASE_TAG}/mintrpc/mint.proto
+curl ${TAPD_URL}/${TAPD_RELEASE_TAG}/taprpc/universerpc/universe.proto --create-dirs -o protos/tapd/${TAPD_RELEASE_TAG}/universerpc/universe.proto
 
 curl ${LIT_URL}/${LIT_RELEASE_TAG}/litrpc/firewall.proto --create-dirs -o protos/lit/${LIT_RELEASE_TAG}/firewall.proto
 curl ${LIT_URL}/${LIT_RELEASE_TAG}/litrpc/lit-sessions.proto --create-dirs -o protos/lit/${LIT_RELEASE_TAG}/lit-sessions.proto
