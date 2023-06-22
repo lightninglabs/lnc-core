@@ -993,6 +993,8 @@ export interface Channel {
     zeroConfConfirmedScid: string;
     /** The configured alias name of our peer. */
     peerAlias: string;
+    /** This is the peer SCID alias. */
+    peerScidAlias: string;
 }
 
 export interface ListChannelsRequest {
@@ -1600,6 +1602,12 @@ export interface OpenChannelRequest {
      * capacity.
      */
     remoteChanReserveSat: string;
+    /**
+     * If set, then lnd will attempt to commit all the coins under control of the
+     * internal wallet to open the channel, and the LocalFundingAmount field must
+     * be zero and is ignored.
+     */
+    fundMax: boolean;
 }
 
 export interface OpenStatusUpdate {
