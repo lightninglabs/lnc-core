@@ -36,9 +36,9 @@ esac
 
 mkdir -p protoc
 if [[ $platform == 'Linux' ]]; then
-    PROTOC_URL="https://github.com/google/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-linux-x86_64.zip"
+    PROTOC_URL="https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-linux-x86_64.zip"
 elif [[ $platform == 'Mac' ]]; then
-    PROTOC_URL="https://github.com/google/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-osx-x86_64.zip"
+    PROTOC_URL="https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-osx-x86_64.zip"
 else
     echo "Cannot download protoc. ${platform} is not currently supported by ts-protoc-gen"
     exit 1
@@ -129,7 +129,7 @@ protoc/bin/protoc \
   $TS_PROTO_OPTIONS \
   firewall.proto \
   lit-sessions.proto \
-  lit-autopilot.proto 
+  lit-autopilot.proto
 
 # Temporarily generate schema files in order to provide metadata
 # about the services and subscription methods to the api classes
@@ -217,7 +217,7 @@ protoc/bin/protoc \
   $SCHEMA_PROTO_OPTIONS \
   firewall.proto \
   lit-sessions.proto \
-  lit-autopilot.proto 
+  lit-autopilot.proto
 
 # Cleanup proto directory/files
 rm -rf *.proto protoc
