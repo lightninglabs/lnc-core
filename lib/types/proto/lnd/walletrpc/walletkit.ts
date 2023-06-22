@@ -86,6 +86,67 @@ export enum WitnessType {
      * transaction.
      */
     COMMITMENT_ANCHOR = 'COMMITMENT_ANCHOR',
+    /**
+     * COMMITMENT_NO_DELAY_TWEAKLESS - A witness type that is similar to the COMMITMENT_NO_DELAY type,
+     * but it omits the tweak that randomizes the key we need to
+     * spend with a channel peer supplied set of randomness.
+     */
+    COMMITMENT_NO_DELAY_TWEAKLESS = 'COMMITMENT_NO_DELAY_TWEAKLESS',
+    /**
+     * COMMITMENT_TO_REMOTE_CONFIRMED - A witness type that allows us to spend our output on the counterparty's
+     * commitment transaction after a confirmation.
+     */
+    COMMITMENT_TO_REMOTE_CONFIRMED = 'COMMITMENT_TO_REMOTE_CONFIRMED',
+    /**
+     * HTLC_OFFERED_TIMEOUT_SECOND_LEVEL_INPUT_CONFIRMED - A witness type that allows us to sweep an HTLC output that we extended
+     * to a party, but was never fulfilled. This _is_ the HTLC output directly
+     * on our commitment transaction, and the input to the second-level HTLC
+     * timeout transaction. It can only be spent after CLTV expiry, and
+     * commitment confirmation.
+     */
+    HTLC_OFFERED_TIMEOUT_SECOND_LEVEL_INPUT_CONFIRMED = 'HTLC_OFFERED_TIMEOUT_SECOND_LEVEL_INPUT_CONFIRMED',
+    /**
+     * HTLC_ACCEPTED_SUCCESS_SECOND_LEVEL_INPUT_CONFIRMED - A witness type that allows us to sweep an HTLC output that was offered
+     * to us, and for which we have a payment preimage. This _is_ the HTLC
+     * output directly on our commitment transaction, and the input to the
+     * second-level HTLC success transaction. It can only be spent after the
+     * commitment has confirmed.
+     */
+    HTLC_ACCEPTED_SUCCESS_SECOND_LEVEL_INPUT_CONFIRMED = 'HTLC_ACCEPTED_SUCCESS_SECOND_LEVEL_INPUT_CONFIRMED',
+    /**
+     * LEASE_COMMITMENT_TIME_LOCK - A witness type that allows us to spend our output on our local
+     * commitment transaction after a relative and absolute lock-time lockout as
+     * part of the script enforced lease commitment type.
+     */
+    LEASE_COMMITMENT_TIME_LOCK = 'LEASE_COMMITMENT_TIME_LOCK',
+    /**
+     * LEASE_COMMITMENT_TO_REMOTE_CONFIRMED - A witness type that allows us to spend our output on the counterparty's
+     * commitment transaction after a confirmation and absolute locktime as part
+     * of the script enforced lease commitment type.
+     */
+    LEASE_COMMITMENT_TO_REMOTE_CONFIRMED = 'LEASE_COMMITMENT_TO_REMOTE_CONFIRMED',
+    /**
+     * LEASE_HTLC_OFFERED_TIMEOUT_SECOND_LEVEL - A witness type that allows us to sweep an HTLC output that we extended
+     * to a party, but was never fulfilled. This HTLC output isn't directly on
+     * the commitment transaction, but is the result of a confirmed second-level
+     * HTLC transaction. As a result, we can only spend this after a CSV delay
+     * and CLTV locktime as part of the script enforced lease commitment type.
+     */
+    LEASE_HTLC_OFFERED_TIMEOUT_SECOND_LEVEL = 'LEASE_HTLC_OFFERED_TIMEOUT_SECOND_LEVEL',
+    /**
+     * LEASE_HTLC_ACCEPTED_SUCCESS_SECOND_LEVEL - A witness type that allows us to sweep an HTLC output that was offered
+     * to us, and for which we have a payment preimage. This HTLC output isn't
+     * directly on our commitment transaction, but is the result of confirmed
+     * second-level HTLC transaction. As a result, we can only spend this after
+     * a CSV delay and CLTV locktime as part of the script enforced lease
+     * commitment type.
+     */
+    LEASE_HTLC_ACCEPTED_SUCCESS_SECOND_LEVEL = 'LEASE_HTLC_ACCEPTED_SUCCESS_SECOND_LEVEL',
+    /**
+     * TAPROOT_PUB_KEY_SPEND - A witness type that allows us to spend a regular p2tr output that's sent
+     * to an output which is under complete control of the backing wallet.
+     */
+    TAPROOT_PUB_KEY_SPEND = 'TAPROOT_PUB_KEY_SPEND',
     UNRECOGNIZED = 'UNRECOGNIZED'
 }
 

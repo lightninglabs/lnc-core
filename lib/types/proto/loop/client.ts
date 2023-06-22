@@ -559,6 +559,40 @@ export interface LsatToken {
     storageName: string;
 }
 
+export interface LoopStats {
+    /** Number of currently pending swaps. */
+    pendingCount: string;
+    /** Number of succeeded swaps. */
+    successCount: string;
+    /** Number failed swaps. */
+    failCount: string;
+    /** The sum of all pending swap amounts. */
+    sumPendingAmt: string;
+    /** The sum of all succeeded swap amounts. */
+    sumSucceededAmt: string;
+}
+
+export interface GetInfoRequest {}
+
+export interface GetInfoResponse {
+    /** The current daemon version. */
+    version: string;
+    /** The network the daemon is running on. */
+    network: string;
+    /** Host and port of the loopd grpc server. */
+    rpcListen: string;
+    /** Host and port of the loopd rest server. */
+    restListen: string;
+    /** Loop's macaroon path that clients use to talk to the daemon. */
+    macaroonPath: string;
+    /** Loop's tls cert path */
+    tlsCertPath: string;
+    /** Statistics about loop outs. */
+    loopOutStats: LoopStats | undefined;
+    /** Statistics about loop ins. */
+    loopInStats: LoopStats | undefined;
+}
+
 export interface GetLiquidityParamsRequest {}
 
 export interface LiquidityParameters {
@@ -668,6 +702,19 @@ export interface LiquidityParameters {
      * UNIX timestamp in seconds.
      */
     autoloopBudgetLastRefresh: string;
+    /**
+     * Set to true to enable easy autoloop. If set, all channel/peer rules will be
+     * overridden and the client will automatically dispatch swaps in order to meet
+     * the configured local balance target size. Currently only loop out is
+     * supported, meaning that easy autoloop can only reduce the funds that are
+     * held as balance in channels.
+     */
+    easyAutoloop: boolean;
+    /**
+     * The local balance target size, expressed in satoshis. This is used by easy
+     * autoloop to determine how much liquidity should be maintained in channels.
+     */
+    easyAutoloopLocalTargetSat: string;
 }
 
 export interface LiquidityRule {
@@ -821,6 +868,11 @@ export interface SwapClient {
     getLsatTokens(
         request?: DeepPartial<TokensRequest>
     ): Promise<TokensResponse>;
+    /**
+     * loop: `getinfo`
+     * GetInfo gets basic information about the loop daemon.
+     */
+    getInfo(request?: DeepPartial<GetInfoRequest>): Promise<GetInfoResponse>;
     /**
      * loop: `getparams`
      * GetLiquidityParams gets the parameters that the daemon's liquidity manager

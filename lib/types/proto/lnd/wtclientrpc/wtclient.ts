@@ -34,6 +34,11 @@ export interface GetTowerInfoRequest {
     pubkey: Uint8Array | string;
     /** Whether we should include sessions with the watchtower in the response. */
     includeSessions: boolean;
+    /**
+     * Whether to exclude exhausted sessions in the response info. This option
+     * is only meaningful if include_sessions is true.
+     */
+    excludeExhaustedSessions: boolean;
 }
 
 export interface TowerSession {
@@ -69,17 +74,53 @@ export interface Tower {
     pubkey: Uint8Array | string;
     /** The list of addresses the watchtower is reachable over. */
     addresses: string[];
+    /**
+     * Deprecated, use the active_session_candidate field under the
+     * correct identifier in the client_type map.
+     * Whether the watchtower is currently a candidate for new sessions.
+     *
+     * @deprecated
+     */
+    activeSessionCandidate: boolean;
+    /**
+     * Deprecated, use the num_sessions field under the correct identifier
+     * in the client_type map.
+     * The number of sessions that have been negotiated with the watchtower.
+     *
+     * @deprecated
+     */
+    numSessions: number;
+    /**
+     * Deprecated, use the sessions field under the correct identifier in the
+     * client_type map.
+     * The list of sessions that have been negotiated with the watchtower.
+     *
+     * @deprecated
+     */
+    sessions: TowerSession[];
+    /** A list sessions held with the tower. */
+    sessionInfo: TowerSessionInfo[];
+}
+
+export interface TowerSessionInfo {
     /** Whether the watchtower is currently a candidate for new sessions. */
     activeSessionCandidate: boolean;
     /** The number of sessions that have been negotiated with the watchtower. */
     numSessions: number;
     /** The list of sessions that have been negotiated with the watchtower. */
     sessions: TowerSession[];
+    /** The session's policy type. */
+    policyType: PolicyType;
 }
 
 export interface ListTowersRequest {
     /** Whether we should include sessions with the watchtower in the response. */
     includeSessions: boolean;
+    /**
+     * Whether to exclude exhausted sessions in the response info. This option
+     * is only meaningful if include_sessions is true.
+     */
+    excludeExhaustedSessions: boolean;
 }
 
 export interface ListTowersResponse {
