@@ -36,6 +36,8 @@ After specifying the latest versions, run the following commands in the root
 dir of the project.
 
 ```sh
+# install package dependencies
+yarn
 # download new proto files
 yarn run update-protos
 # generate Typescript definitions from the updated protos
