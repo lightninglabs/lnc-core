@@ -20,6 +20,10 @@ FARADAY_URL="https://raw.githubusercontent.com/lightninglabs/faraday"
 TAPD_URL="https://raw.githubusercontent.com/lightninglabs/taproot-assets"
 LIT_URL="https://raw.githubusercontent.com/lightninglabs/lightning-terminal"
 
+# remove old protos
+rm -rf protos
+
+# download new protos
 curl ${LND_URL}/${LND_RELEASE_TAG}/lnrpc/lightning.proto --create-dirs -o protos/lnd/${LND_RELEASE_TAG}/lightning.proto
 curl ${LND_URL}/${LND_RELEASE_TAG}/lnrpc/walletunlocker.proto --create-dirs -o protos/lnd/${LND_RELEASE_TAG}/walletunlocker.proto
 curl ${LND_URL}/${LND_RELEASE_TAG}/lnrpc/autopilotrpc/autopilot.proto --create-dirs -o protos/lnd/${LND_RELEASE_TAG}/autopilotrpc/autopilot.proto

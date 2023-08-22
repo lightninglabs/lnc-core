@@ -18,10 +18,10 @@ export enum AssetType {
 
 export enum AssetMetaType {
     /**
-     * MTEA_TYPE_OPAQUE - Opaque is used for asset meta blobs that have no true structure and instead
+     * META_TYPE_OPAQUE - Opaque is used for asset meta blobs that have no true structure and instead
      * should be interpreted as opaque blobs.
      */
-    MTEA_TYPE_OPAQUE = 'MTEA_TYPE_OPAQUE',
+    META_TYPE_OPAQUE = 'META_TYPE_OPAQUE',
     UNRECOGNIZED = 'UNRECOGNIZED'
 }
 
@@ -92,7 +92,7 @@ export interface AnchorInfo {
     /** The txid of the above transaction. */
     anchorTxid: string;
     /** The block hash the contains the anchor transaction above. */
-    anchorBlockHash: Uint8Array | string;
+    anchorBlockHash: string;
     /** The outpoint (txid:vout) that stores the Taproot Asset commitment. */
     anchorOutpoint: string;
     /** The raw internal key that was used to create the anchor Taproot output key. */
@@ -109,6 +109,8 @@ export interface AnchorInfo {
      * anchor output.
      */
     tapscriptSibling: Uint8Array | string;
+    /** The height of the block which contains the anchor transaction. */
+    blockHeight: number;
 }
 
 export interface GenesisInfo {
@@ -497,8 +499,70 @@ export interface ProofFile {
     genesisPoint: string;
 }
 
-export interface ProofVerifyResponse {
+export interface DecodedProof {
+    /** The index depth of the decoded proof, with 0 being the latest proof. */
+    proofAtDepth: number;
+    /** The total number of proofs contained in the raw proof. */
+    numberOfProofs: number;
+    /** The asset referenced in the proof. */
+    asset: Asset | undefined;
+    /** The reveal meta data associated with the proof, if available. */
+    metaReveal: AssetMeta | undefined;
+    /**
+     * The merkle proof for AnchorTx used to prove its
+     * inclusion within BlockHeader.
+     */
+    txMerkleProof: Uint8Array | string;
+    /**
+     * The TaprootProof proving the new inclusion of the
+     * resulting asset within AnchorTx.
+     */
+    inclusionProof: Uint8Array | string;
+    /**
+     * The set of TaprootProofs proving the exclusion of
+     * the resulting asset from all other Taproot outputs within AnchorTx.
+     */
+    exclusionProofs: Uint8Array | string[];
+    /**
+     * An optional TaprootProof needed if this asset is
+     * the result of a split. SplitRootProof proves inclusion of the root
+     * asset of the split.
+     */
+    splitRootProof: Uint8Array | string;
+    /**
+     * The number of additional nested full proofs for any inputs found within
+     * the resulting asset.
+     */
+    numAdditionalInputs: number;
+    /**
+     * ChallengeWitness is an optional virtual transaction witness that serves
+     * as an ownership proof for the asset. If this is non-nil, then it is a
+     * valid transfer witness for a 1-input, 1-output virtual transaction that
+     * spends the asset in this proof and sends it to the NUMS key, to prove
+     * that the creator of the proof is able to produce a valid signature to
+     * spend the asset.
+     */
+    challengeWitness: Uint8Array | string[];
+}
+
+export interface VerifyProofResponse {
     valid: boolean;
+    decodedProof: DecodedProof | undefined;
+}
+
+export interface DecodeProofRequest {
+    /** The raw proof in bytes to decode, which may contain multiple proofs. */
+    rawProof: Uint8Array | string;
+    /** The index depth of the decoded proof, with 0 being the latest proof. */
+    proofAtDepth: number;
+    /** An option to include previous witnesses in decoding. */
+    withPrevWitnesses: boolean;
+    /** An option to attempt to retrieve the meta data associated with the proof. */
+    withMetaReveal: boolean;
+}
+
+export interface DecodeProofResponse {
+    decodedProof: DecodedProof | undefined;
 }
 
 export interface ExportProofRequest {
@@ -567,6 +631,14 @@ export interface PrevInputAsset {
 
 export interface SendAssetResponse {
     transfer: AssetTransfer | undefined;
+}
+
+export interface GetInfoRequest {}
+
+export interface GetInfoResponse {
+    version: string;
+    lndVersion: string;
+    network: string;
 }
 
 export interface SubscribeSendAssetEventNtfnsRequest {}
@@ -694,7 +766,15 @@ export interface TaprootAssets {
      * VerifyProof attempts to verify a given proof file that claims to be anchored
      * at the specified genesis point.
      */
-    verifyProof(request?: DeepPartial<ProofFile>): Promise<ProofVerifyResponse>;
+    verifyProof(request?: DeepPartial<ProofFile>): Promise<VerifyProofResponse>;
+    /**
+     * tarocli: `proofs decode`
+     * DecodeProof attempts to decode a given proof file into human readable
+     * format.
+     */
+    decodeProof(
+        request?: DeepPartial<DecodeProofRequest>
+    ): Promise<DecodeProofResponse>;
     /**
      * tapcli: `proofs export`
      * ExportProof exports the latest raw proof file anchored at the specified
@@ -720,6 +800,11 @@ export interface TaprootAssets {
     sendAsset(
         request?: DeepPartial<SendAssetRequest>
     ): Promise<SendAssetResponse>;
+    /**
+     * tapcli: `getinfo`
+     * GetInfo returns the information for the node.
+     */
+    getInfo(request?: DeepPartial<GetInfoRequest>): Promise<GetInfoResponse>;
     /**
      * SubscribeSendAssetEventNtfns registers a subscription to the event
      * notification stream which relates to the asset sending process.

@@ -1,6 +1,18 @@
 /* eslint-disable */
 import type { RouteHint } from './swapserverrpc/common';
 
+/**
+ * `AddressType` has to be one of:
+ *
+ * - `unknown`: Unknown address type
+ * - `p2tr`: Pay to taproot pubkey (`TAPROOT_PUBKEY` = 1)
+ */
+export enum AddressType {
+    ADDRESS_TYPE_UNKNOWN = 'ADDRESS_TYPE_UNKNOWN',
+    TAPROOT_PUBKEY = 'TAPROOT_PUBKEY',
+    UNRECOGNIZED = 'UNRECOGNIZED'
+}
+
 export enum SwapType {
     /** LOOP_OUT - LOOP_OUT indicates an loop out swap (off-chain to on-chain) */
     LOOP_OUT = 'LOOP_OUT',
@@ -247,6 +259,14 @@ export interface LoopOutRequest {
      * triggering the swap (loop CLI, autolooper, LiT UI, other 3rd party UI).
      */
     initiator: string;
+    /**
+     * An alternative destination address source for the swap. This field
+     * represents the name of the account in the backing lnd instance.
+     * Refer to lnd's wallet import functions for reference.
+     */
+    account: string;
+    /** The address type of the account specified in the account field. */
+    accountAddrType: AddressType;
 }
 
 export interface LoopInRequest {
@@ -557,6 +577,8 @@ export interface LsatToken {
      * file name of the token where it's stored on the file system.
      */
     storageName: string;
+    /** The l402 ID of the token. */
+    id: string;
 }
 
 export interface LoopStats {
@@ -715,6 +737,14 @@ export interface LiquidityParameters {
      * autoloop to determine how much liquidity should be maintained in channels.
      */
     easyAutoloopLocalTargetSat: string;
+    /**
+     * An alternative destination address source for the swap. This field
+     * represents the name of the account in the backing lnd instance.
+     * Refer to lnd's wallet import functions for reference.
+     */
+    account: string;
+    /** The address type of the account specified in the account field. */
+    accountAddrType: AddressType;
 }
 
 export interface LiquidityRule {

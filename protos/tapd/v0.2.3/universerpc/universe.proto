@@ -19,6 +19,12 @@ service Universe {
     */
     rpc QueryAssetRoots (AssetRootQuery) returns (QueryRootResponse);
 
+    /* tapcli: `universe delete`
+    DeleteAssetRoot deletes the Universe root for a specific asset, including
+    all asoociated universe keys, leaves, and events.
+    */
+    rpc DeleteAssetRoot (DeleteRootQuery) returns (DeleteRootResponse);
+
     /* tapcli: `universe keys`
     AssetLeafKeys queries for the set of Universe keys associated with a given
     asset_id or group_key. Each key takes the form: (outpoint, script_key),
@@ -61,6 +67,11 @@ service Universe {
 
     // TODO(roasbeef): rename resp to UniverseStateUpdate? ^
 
+    /* tapcli: `universe info`
+    Info returns a set of information about the current state of the Universe.
+    */
+    rpc Info (InfoRequest) returns (InfoResponse);
+
     /* tapcli: `universe sync`
     SyncUniverse takes host information for a remote Universe server, then
     attempts to synchronize either only the set of specified asset_ids, or all
@@ -96,7 +107,7 @@ service Universe {
         returns (DeleteFederationServerResponse);
 
     /* tapcli: `universe stats`
-    UniverseStats returns a set of aggregrate statistics for the current state
+    UniverseStats returns a set of aggregate statistics for the current state
     of the Universe. Stats returned include: total number of syncs, total
     number of proofs, and total number of known assets.
     */
@@ -109,6 +120,12 @@ service Universe {
     Results can also be sorted based on any of the main query params.
     */
     rpc QueryAssetStats (AssetStatsQuery) returns (UniverseAssetStats);
+
+    /* tapcli `universe stats events`
+    QueryEvents returns the number of sync and proof events for a given time
+    period, grouped by day.
+    */
+    rpc QueryEvents (QueryEventsRequest) returns (QueryEventsResponse);
 }
 
 message AssetRootRequest {
@@ -130,16 +147,17 @@ message MerkleSumNode {
 
 message ID {
     oneof id {
-        // The 32-byte asset ID.
+        // The 32-byte asset ID specified as raw bytes (gRPC only).
         bytes asset_id = 1;
 
-        // The 32-byte asset ID encoded as a hex string.
+        // The 32-byte asset ID encoded as a hex string (use this for REST).
         string asset_id_str = 2;
 
-        // The 32-byte asset group key.
+        // The 32-byte asset group key specified as raw bytes (gRPC only).
         bytes group_key = 3;
 
-        // The 32-byte asset group key encoded as hex string.
+        // The 32-byte asset group key encoded as hex string (use this for
+        // REST).
         string group_key_str = 4;
     }
 }
@@ -169,6 +187,14 @@ message AssetRootQuery {
 message QueryRootResponse {
     // The asset root for the given asset ID or group key.
     UniverseRoot asset_root = 1;
+}
+
+message DeleteRootQuery {
+    // An ID value to uniquely identify a Universe root.
+    ID id = 1;
+}
+
+message DeleteRootResponse {
 }
 
 message Outpoint {
@@ -249,6 +275,19 @@ message AssetProof {
 
     // The asset leaf to insert into the Universe tree.
     AssetLeaf asset_leaf = 4;
+}
+
+message InfoRequest {
+}
+
+message InfoResponse {
+    // A pseudo-random runtime ID for the current instance of the Universe
+    // server, changes with each restart. Mainly used to identify identical
+    // servers when they are exposed under different hostnames/ports.
+    int64 runtime_id = 1;
+
+    // The number of assets known to this Universe server.
+    uint64 num_assets = 2;
 }
 
 enum UniverseSyncMode {
@@ -337,6 +376,12 @@ enum AssetQuerySort {
     SORT_BY_ASSET_ID = 2;
 
     SORT_BY_ASSET_TYPE = 3;
+
+    SORT_BY_TOTAL_SYNCS = 4;
+
+    SORT_BY_TOTAL_PROOFS = 5;
+
+    SORT_BY_GENESIS_HEIGHT = 6;
 }
 
 enum AssetTypeFilter {
@@ -364,19 +409,41 @@ message AssetStatsQuery {
 message AssetStatsSnapshot {
     bytes asset_id = 1;
 
-    int64 total_supply = 2;
+    bytes group_key = 2;
 
-    string asset_name = 3;
+    string genesis_point = 3;
 
-    taprpc.AssetType asset_type = 4;
+    int64 total_supply = 4;
 
-    int32 genesis_height = 5;
+    string asset_name = 5;
 
-    int64 total_syncs = 6;
+    taprpc.AssetType asset_type = 6;
 
-    int64 total_proofs = 7;
+    int32 genesis_height = 7;
+
+    int64 genesis_timestamp = 8;
+
+    int64 total_syncs = 9;
+
+    int64 total_proofs = 10;
 }
 
 message UniverseAssetStats {
     repeated AssetStatsSnapshot asset_stats = 1;
+}
+
+message QueryEventsRequest {
+    int64 start_timestamp = 1;
+    int64 end_timestamp = 2;
+}
+
+message QueryEventsResponse {
+    repeated GroupedUniverseEvents events = 1;
+}
+
+message GroupedUniverseEvents {
+    // The date the events occurred on, formatted as YYYY-MM-DD.
+    string date = 1;
+    uint64 sync_events = 2;
+    uint64 new_proof_events = 3;
 }
