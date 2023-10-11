@@ -10,7 +10,7 @@
     "pool_release_tag": "v0.6.4-beta",
     "faraday_release_tag": "v0.2.11-alpha",
     "tapd_release_tag": "v0.2.3",
-    "lit_release_tag": "v0.10.5-alpha",
+    "lit_release_tag": "v0.12.0-alpha",
     "protoc_version": "21.9"
   },
   "scripts": {
