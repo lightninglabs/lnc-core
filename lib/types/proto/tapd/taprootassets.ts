@@ -25,6 +25,20 @@ export enum AssetMetaType {
     UNRECOGNIZED = 'UNRECOGNIZED'
 }
 
+export enum AssetVersion {
+    /**
+     * ASSET_VERSION_V0 - ASSET_VERSION_V0 is the default asset version. This version will include
+     * the witness vector in the leaf for a tap commitment.
+     */
+    ASSET_VERSION_V0 = 'ASSET_VERSION_V0',
+    /**
+     * ASSET_VERSION_V1 - ASSET_VERSION_V1 is the asset version that leaves out the witness vector
+     * from the MS-SMT leaf encoding.
+     */
+    ASSET_VERSION_V1 = 'ASSET_VERSION_V1',
+    UNRECOGNIZED = 'UNRECOGNIZED'
+}
+
 export enum OutputType {
     /**
      * OUTPUT_TYPE_SIMPLE - OUTPUT_TYPE_SIMPLE is a plain full-value or split output that is not a
@@ -51,6 +65,15 @@ export enum OutputType {
      * output, as well as passive assets.
      */
     OUTPUT_TYPE_PASSIVE_SPLIT_ROOT = 'OUTPUT_TYPE_PASSIVE_SPLIT_ROOT',
+    /**
+     * OUTPUT_TYPE_SIMPLE_PASSIVE_ASSETS - OUTPUT_TYPE_SIMPLE_PASSIVE_ASSETS is a plain full-value interactive send
+     * output that also carries passive assets. This is a special case where we
+     * send the full value of a single asset in a commitment to a new script
+     * key, but also carry passive assets in the same output. This is useful for
+     * key rotation (send-to-self) scenarios or asset burns where we burn the
+     * full supply of a single asset within a commitment.
+     */
+    OUTPUT_TYPE_SIMPLE_PASSIVE_ASSETS = 'OUTPUT_TYPE_SIMPLE_PASSIVE_ASSETS',
     UNRECOGNIZED = 'UNRECOGNIZED'
 }
 
@@ -66,7 +89,8 @@ export enum AddrEventStatus {
 export interface AssetMeta {
     /**
      * The raw data of the asset meta data. Based on the type below, this may be
-     * structured data such as a text file or PDF.
+     * structured data such as a text file or PDF. The size of the data is limited
+     * to 1MiB.
      */
     data: Uint8Array | string;
     /** The type of the asset meta data. */
@@ -81,6 +105,7 @@ export interface AssetMeta {
 export interface ListAssetRequest {
     withWitness: boolean;
     includeSpent: boolean;
+    includeLeased: boolean;
 }
 
 export interface AnchorInfo {
@@ -139,13 +164,30 @@ export interface AssetGroup {
      * asset type.
      */
     tweakedGroupKey: Uint8Array | string;
-    /** A signature over the genesis point using the above key. */
-    assetIdSig: Uint8Array | string;
+    /**
+     * A witness that authorizes a specific asset to be part of the asset group
+     * specified by the above key.
+     */
+    assetWitness: Uint8Array | string;
+}
+
+export interface GroupKeyReveal {
+    /** The raw group key which is a normal public key. */
+    rawGroupKey: Uint8Array | string;
+    /** The tapscript root included in the tweaked group key, which may be empty. */
+    tapscriptRoot: Uint8Array | string;
+}
+
+export interface GenesisReveal {
+    /** The base genesis information in the genesis reveal. */
+    genesisBaseReveal: GenesisInfo | undefined;
+    /** The asset type, not included in the base genesis info. */
+    assetType: AssetType;
 }
 
 export interface Asset {
     /** The version of the Taproot Asset. */
-    version: number;
+    version: AssetVersion;
     /** The base genesis information of an asset. This information never changes. */
     assetGenesis: GenesisInfo | undefined;
     /** The type of the asset. */
@@ -172,6 +214,21 @@ export interface Asset {
     prevWitnesses: PrevWitness[];
     /** Indicates whether the asset has been spent. */
     isSpent: boolean;
+    /**
+     * If the asset has been leased, this is the owner (application ID) of the
+     * lease.
+     */
+    leaseOwner: Uint8Array | string;
+    /**
+     * If the asset has been leased, this is the expiry of the lease as a Unix
+     * timestamp in seconds.
+     */
+    leaseExpiry: string;
+    /**
+     * Indicates whether this transfer was an asset burn. If true, the number of
+     * assets in this output are destroyed and can no longer be spent.
+     */
+    isBurn: boolean;
 }
 
 export interface PrevWitness {
@@ -188,7 +245,9 @@ export interface ListAssetResponse {
     assets: Asset[];
 }
 
-export interface ListUtxosRequest {}
+export interface ListUtxosRequest {
+    includeLeased: boolean;
+}
 
 export interface ManagedUtxo {
     /** The outpoint of the UTXO. */
@@ -236,6 +295,8 @@ export interface AssetHumanReadable {
     metaHash: Uint8Array | string;
     /** The type of the asset. */
     type: AssetType;
+    /** The version of the asset. */
+    version: AssetVersion;
 }
 
 export interface GroupedAssets {
@@ -357,9 +418,14 @@ export interface TransferOutput {
     scriptKey: Uint8Array | string;
     scriptKeyIsLocal: boolean;
     amount: string;
+    /**
+     * The new individual transition proof (not a full proof file) that proves
+     * the inclusion of the new asset within the new AnchorTx.
+     */
     newProofBlob: Uint8Array | string;
     splitCommitRootHash: Uint8Array | string;
     outputType: OutputType;
+    assetVersion: AssetVersion;
 }
 
 export interface StopRequest {}
@@ -407,6 +473,10 @@ export interface Addr {
      * transfer assets described in this address.
      */
     taprootOutputKey: Uint8Array | string;
+    /** The address of the proof courier service used in proof transfer. */
+    proofCourierAddr: string;
+    /** The asset version of the address. */
+    assetVersion: AssetVersion;
 }
 
 export interface QueryAddrRequest {
@@ -458,6 +528,13 @@ export interface NewAddrRequest {
      * commitment of the asset.
      */
     tapscriptSibling: Uint8Array | string;
+    /**
+     * An optional proof courier address for use in proof transfer. If unspecified,
+     * the daemon configured default address will be used.
+     */
+    proofCourierAddr: string;
+    /** The asset version to use when sending/receiving to/from this address. */
+    assetVersion: AssetVersion;
 }
 
 export interface ScriptKey {
@@ -495,14 +572,22 @@ export interface DecodeAddrRequest {
 }
 
 export interface ProofFile {
-    rawProof: Uint8Array | string;
+    /**
+     * The raw proof file encoded as bytes. Must be a file and not just an
+     * individual mint/transfer proof.
+     */
+    rawProofFile: Uint8Array | string;
     genesisPoint: string;
 }
 
 export interface DecodedProof {
     /** The index depth of the decoded proof, with 0 being the latest proof. */
     proofAtDepth: number;
-    /** The total number of proofs contained in the raw proof. */
+    /**
+     * The total number of proofs contained in the decoded proof file (this will
+     * always be 1 if a single mint/transition proof was given as the raw_proof
+     * instead of a file).
+     */
     numberOfProofs: number;
     /** The asset referenced in the proof. */
     asset: Asset | undefined;
@@ -543,17 +628,43 @@ export interface DecodedProof {
      * spend the asset.
      */
     challengeWitness: Uint8Array | string[];
+    /**
+     * Indicates whether the state transition this proof represents is a burn,
+     * meaning that the assets were provably destroyed and can no longer be
+     * spent.
+     */
+    isBurn: boolean;
+    /**
+     * GenesisReveal is an optional field that is the Genesis information for
+     * the asset. This is required for minting proofs.
+     */
+    genesisReveal: GenesisReveal | undefined;
+    /**
+     * GroupKeyReveal is an optional field that includes the information needed
+     * to derive the tweaked group key.
+     */
+    groupKeyReveal: GroupKeyReveal | undefined;
 }
 
 export interface VerifyProofResponse {
     valid: boolean;
+    /** The decoded last proof in the file if the proof file was valid. */
     decodedProof: DecodedProof | undefined;
 }
 
 export interface DecodeProofRequest {
-    /** The raw proof in bytes to decode, which may contain multiple proofs. */
+    /**
+     * The raw proof bytes to decode. This can be a full proof file or a single
+     * mint/transition proof. If it is a full proof file, the proof_at_depth
+     * field will be used to determine which individual proof within the file to
+     * decode.
+     */
     rawProof: Uint8Array | string;
-    /** The index depth of the decoded proof, with 0 being the latest proof. */
+    /**
+     * The index depth of the decoded proof, with 0 being the latest proof. This
+     * is ignored if the raw_proof is a single mint/transition proof and not a
+     * proof file.
+     */
     proofAtDepth: number;
     /** An option to include previous witnesses in decoding. */
     withPrevWitnesses: boolean;
@@ -569,13 +680,6 @@ export interface ExportProofRequest {
     assetId: Uint8Array | string;
     scriptKey: Uint8Array | string;
 }
-
-export interface ImportProofRequest {
-    proofFile: Uint8Array | string;
-    genesisPoint: string;
-}
-
-export interface ImportProofResponse {}
 
 export interface AddrEvent {
     /** The time the event was created in unix timestamp seconds. */
@@ -620,6 +724,8 @@ export interface AddrReceivesResponse {
 
 export interface SendAssetRequest {
     tapAddrs: string[];
+    /** The optional fee rate to use for the minting transaction, in sat/kw. */
+    feeRate: number;
 }
 
 export interface PrevInputAsset {
@@ -639,6 +745,11 @@ export interface GetInfoResponse {
     version: string;
     lndVersion: string;
     network: string;
+    lndIdentityPubkey: string;
+    nodeAlias: string;
+    blockHeight: number;
+    blockHash: string;
+    syncToChain: boolean;
 }
 
 export interface SubscribeSendAssetEventNtfnsRequest {}
@@ -678,6 +789,31 @@ export interface FetchAssetMetaRequest {
     assetId: Uint8Array | string | undefined;
     /** The 32-byte meta hash of the asset meta. */
     metaHash: Uint8Array | string | undefined;
+    /** The hex encoded asset ID of the asset to fetch the meta for. */
+    assetIdStr: string | undefined;
+    /** The hex encoded meta hash of the asset meta. */
+    metaHashStr: string | undefined;
+}
+
+export interface BurnAssetRequest {
+    /** The asset ID of the asset to burn units of. */
+    assetId: Uint8Array | string | undefined;
+    /** The hex encoded asset ID of the asset to burn units of. */
+    assetIdStr: string | undefined;
+    amountToBurn: string;
+    /**
+     * A safety check to ensure the user is aware of the destructive nature of
+     * the burn. This needs to be set to the value "assets will be destroyed"
+     * for the burn to succeed.
+     */
+    confirmationText: string;
+}
+
+export interface BurnAssetResponse {
+    /** The asset transfer that contains the asset burn as an output. */
+    burnTransfer: AssetTransfer | undefined;
+    /** The burn transition proof for the asset burn output. */
+    burnProof: DecodedProof | undefined;
 }
 
 export interface TaprootAssets {
@@ -768,7 +904,7 @@ export interface TaprootAssets {
      */
     verifyProof(request?: DeepPartial<ProofFile>): Promise<VerifyProofResponse>;
     /**
-     * tarocli: `proofs decode`
+     * tapcli: `proofs decode`
      * DecodeProof attempts to decode a given proof file into human readable
      * format.
      */
@@ -782,15 +918,6 @@ export interface TaprootAssets {
      */
     exportProof(request?: DeepPartial<ExportProofRequest>): Promise<ProofFile>;
     /**
-     * tapcli: `proofs import`
-     * ImportProof attempts to import a proof file into the daemon. If successful,
-     * a new asset will be inserted on disk, spendable using the specified target
-     * script key, and internal key.
-     */
-    importProof(
-        request?: DeepPartial<ImportProofRequest>
-    ): Promise<ImportProofResponse>;
-    /**
      * tapcli: `assets send`
      * SendAsset uses one or multiple passed Taproot Asset address(es) to attempt
      * to complete an asset send. The method returns information w.r.t the on chain
@@ -800,6 +927,17 @@ export interface TaprootAssets {
     sendAsset(
         request?: DeepPartial<SendAssetRequest>
     ): Promise<SendAssetResponse>;
+    /**
+     * tapcli: `assets burn`
+     * BurnAsset burns the given number of units of a given asset by sending them
+     * to a provably un-spendable script key. Burning means irrevocably destroying
+     * a certain number of assets, reducing the total supply of the asset. Because
+     * burning is such a destructive and non-reversible operation, some specific
+     * values need to be set in the request to avoid accidental burns.
+     */
+    burnAsset(
+        request?: DeepPartial<BurnAssetRequest>
+    ): Promise<BurnAssetResponse>;
     /**
      * tapcli: `getinfo`
      * GetInfo returns the information for the node.

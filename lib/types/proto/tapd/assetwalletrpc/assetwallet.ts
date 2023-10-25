@@ -123,6 +123,13 @@ export interface VerifyAssetOwnershipResponse {
     validProof: boolean;
 }
 
+export interface RemoveUTXOLeaseRequest {
+    /** The outpoint of the UTXO to remove the lease for. */
+    outpoint: OutPoint | undefined;
+}
+
+export interface RemoveUTXOLeaseResponse {}
+
 export interface AssetWallet {
     /**
      * FundVirtualPsbt selects inputs from the available asset commitments to fund
@@ -183,6 +190,13 @@ export interface AssetWallet {
     verifyAssetOwnership(
         request?: DeepPartial<VerifyAssetOwnershipRequest>
     ): Promise<VerifyAssetOwnershipResponse>;
+    /**
+     * RemoveUTXOLease removes the lease/lock/reservation of the given managed
+     * UTXO.
+     */
+    removeUTXOLease(
+        request?: DeepPartial<RemoveUTXOLeaseRequest>
+    ): Promise<RemoveUTXOLeaseResponse>;
 }
 
 type Builtin =
