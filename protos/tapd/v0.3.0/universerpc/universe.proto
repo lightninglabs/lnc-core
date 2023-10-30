@@ -126,6 +126,20 @@ service Universe {
     period, grouped by day.
     */
     rpc QueryEvents (QueryEventsRequest) returns (QueryEventsResponse);
+
+    /*
+    SetFederationSyncConfig sets the configuration of the universe federation
+    sync.
+    */
+    rpc SetFederationSyncConfig (SetFederationSyncConfigRequest)
+        returns (SetFederationSyncConfigResponse);
+
+    /*
+    QueryFederationSyncConfig queries the universe federation sync configuration
+    settings.
+    */
+    rpc QueryFederationSyncConfig (QueryFederationSyncConfigRequest)
+        returns (QueryFederationSyncConfigResponse);
 }
 
 message AssetRootRequest {
@@ -145,6 +159,12 @@ message MerkleSumNode {
     // exposed via iterative queries
 }
 
+enum ProofType {
+    PROOF_TYPE_UNSPECIFIED = 0;
+    PROOF_TYPE_ISSUANCE = 1;
+    PROOF_TYPE_TRANSFER = 2;
+}
+
 message ID {
     oneof id {
         // The 32-byte asset ID specified as raw bytes (gRPC only).
@@ -160,6 +180,8 @@ message ID {
         // REST).
         string group_key_str = 4;
     }
+
+    ProofType proof_type = 5;
 }
 
 message UniverseRoot {
@@ -171,6 +193,15 @@ message UniverseRoot {
 
     // The name of the asset.
     string asset_name = 4;
+
+    // A map of hex encoded asset IDs to the number of units minted for that
+    // asset. This only contains more than one entry for grouped assets and in
+    // that case represents the whole list of assets currently known to exist
+    // within the group. For single (non-grouped) assets, this is equal to the
+    // asset ID above and the sum in the mssmt_root. A hex encoded string is
+    // used as the map key because gRPC does not support using raw bytes for a
+    // map key.
+    map<string, uint64> amounts_by_asset_id = 5;
 }
 
 message AssetRootResponse {
@@ -185,8 +216,11 @@ message AssetRootQuery {
 }
 
 message QueryRootResponse {
-    // The asset root for the given asset ID or group key.
-    UniverseRoot asset_root = 1;
+    // The issuance universe root for the given asset ID or group key.
+    UniverseRoot issuance_root = 1;
+
+    // The transfer universe root for the given asset ID or group key.
+    UniverseRoot transfer_root = 2;
 }
 
 message DeleteRootQuery {
@@ -234,7 +268,8 @@ message AssetLeaf {
     // TODO(roasbeef): only needed for display? can get from proof below ^
 
     // The asset issuance proof, which proves that the asset specified above
-    // was issued properly.
+    // was issued properly. This is always just an individual mint/transfer
+    // proof and never a proof file.
     bytes issuance_proof = 2;
 }
 
@@ -267,6 +302,14 @@ message AssetProofResponse {
 
     // The asset leaf itself, which includes the asset and the issuance proof.
     AssetLeaf asset_leaf = 4;
+
+    // MultiverseRoot is the root of the multiverse tree that includes this
+    // asset leaf.
+    MerkleSumNode multiverse_root = 5;
+
+    // MultiverseInclusionProof is the inclusion proof for the asset leaf in the
+    // multiverse.
+    bytes multiverse_inclusion_proof = 6;
 }
 
 message AssetProof {
@@ -364,8 +407,9 @@ message DeleteFederationServerResponse {
 
 message StatsResponse {
     int64 num_total_assets = 1;
-    int64 num_total_syncs = 2;
-    int64 num_total_proofs = 3;
+    int64 num_total_groups = 2;
+    int64 num_total_syncs = 3;
+    int64 num_total_proofs = 4;
 }
 
 enum AssetQuerySort {
@@ -382,6 +426,14 @@ enum AssetQuerySort {
     SORT_BY_TOTAL_PROOFS = 5;
 
     SORT_BY_GENESIS_HEIGHT = 6;
+
+    SORT_BY_TOTAL_SUPPLY = 7;
+}
+
+enum SortDirection {
+    SORT_DIRECTION_ASC = 0;
+
+    SORT_DIRECTION_DESC = 1;
 }
 
 enum AssetTypeFilter {
@@ -404,28 +456,50 @@ message AssetStatsQuery {
     int32 offset = 5;
 
     int32 limit = 6;
+
+    SortDirection direction = 7;
 }
 
 message AssetStatsSnapshot {
+    // The group key of the asset group. If this is empty, then the asset is
+    // not part of a group.
+    bytes group_key = 1;
+
+    // The total supply of the asset group. If the asset is not part of an asset
+    // group then this is always zero.
+    int64 group_supply = 2;
+
+    // The group anchor that was used to group assets together into an asset
+    // group. This is only set if the asset is part of an asset group.
+    AssetStatsAsset group_anchor = 3;
+
+    // If the asset is not part of an asset group, then this is the asset the
+    // stats below refer to.
+    AssetStatsAsset asset = 4;
+
+    // The total number of syncs either for the asset group or the single asset
+    // if it is not part of a group.
+    int64 total_syncs = 5;
+
+    // The total number of proofs either for the asset group or the single asset
+    // if it is not part of a group.
+    int64 total_proofs = 6;
+}
+
+message AssetStatsAsset {
     bytes asset_id = 1;
 
-    bytes group_key = 2;
+    string genesis_point = 2;
 
-    string genesis_point = 3;
+    int64 total_supply = 3;
 
-    int64 total_supply = 4;
+    string asset_name = 4;
 
-    string asset_name = 5;
+    taprpc.AssetType asset_type = 5;
 
-    taprpc.AssetType asset_type = 6;
+    int32 genesis_height = 6;
 
-    int32 genesis_height = 7;
-
-    int64 genesis_timestamp = 8;
-
-    int64 total_syncs = 9;
-
-    int64 total_proofs = 10;
+    int64 genesis_timestamp = 7;
 }
 
 message UniverseAssetStats {
@@ -446,4 +520,58 @@ message GroupedUniverseEvents {
     string date = 1;
     uint64 sync_events = 2;
     uint64 new_proof_events = 3;
+}
+
+message SetFederationSyncConfigRequest {
+    repeated GlobalFederationSyncConfig global_sync_configs = 1;
+
+    repeated AssetFederationSyncConfig asset_sync_configs = 2;
+}
+
+message SetFederationSyncConfigResponse {
+}
+
+// GlobalFederationSyncConfig is a global proof type specific configuration
+// for universe federation syncing.
+message GlobalFederationSyncConfig {
+    // proof_type is the universe proof type which this config applies to.
+    ProofType proof_type = 1;
+
+    // allow_sync_insert is a boolean that indicates whether leaves from
+    // universes of the given proof type have may be inserted via federation
+    // sync.
+    bool allow_sync_insert = 2;
+
+    // allow_sync_export is a boolean that indicates whether leaves from
+    // universes of the given proof type have may be exported via federation
+    // sync.
+    bool allow_sync_export = 3;
+}
+
+// AssetFederationSyncConfig is an asset universe specific configuration for
+// federation syncing.
+message AssetFederationSyncConfig {
+    // id is the ID of the universe to configure.
+    ID id = 1;
+
+    // allow_sync_insert is a boolean that indicates whether leaves from
+    // universes of the given proof type have may be inserted via federation
+    // sync.
+    bool allow_sync_insert = 2;
+
+    // allow_sync_export is a boolean that indicates whether leaves from
+    // universes of the given proof type have may be exported via federation
+    // sync.
+    bool allow_sync_export = 3;
+}
+
+message QueryFederationSyncConfigRequest {
+    // Target universe ID(s).
+    repeated ID id = 1;
+}
+
+message QueryFederationSyncConfigResponse {
+    repeated GlobalFederationSyncConfig global_sync_configs = 1;
+
+    repeated AssetFederationSyncConfig asset_sync_configs = 2;
 }

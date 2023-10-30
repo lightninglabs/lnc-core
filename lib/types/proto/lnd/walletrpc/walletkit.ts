@@ -531,7 +531,11 @@ export interface ImportTapscriptResponse {
 }
 
 export interface Transaction {
-    /** The raw serialized transaction. */
+    /**
+     * The raw serialized transaction. Despite the field name, this does need to be
+     * specified in raw bytes (or base64 encoded when using REST) and not in hex.
+     * To not break existing software, the field can't simply be renamed.
+     */
     txHex: Uint8Array | string;
     /** An optional label to save with the transaction. Limited to 500 characters. */
     label: string;

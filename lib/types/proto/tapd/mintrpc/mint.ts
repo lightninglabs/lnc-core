@@ -1,5 +1,5 @@
 /* eslint-disable */
-import type { AssetType, AssetMeta } from '../taprootassets';
+import type { AssetType, AssetVersion, AssetMeta } from '../taprootassets';
 
 export enum BatchState {
     BATCH_STATE_UNKNOWN = 'BATCH_STATE_UNKNOWN',
@@ -36,6 +36,8 @@ export interface MintAsset {
      * This asset will be minted with the same group key as the anchor asset.
      */
     groupAnchor: string;
+    /** The version of asset to mint. */
+    assetVersion: AssetVersion;
 }
 
 export interface MintAssetRequest {
@@ -46,19 +48,25 @@ export interface MintAssetRequest {
      * future asset issuance.
      */
     enableEmission: boolean;
+    /**
+     * If true, then the assets currently in the batch won't be returned in the
+     * response. This is mainly to avoid a lot of data being transmitted and
+     * possibly printed on the command line in the case of a very large batch.
+     */
+    shortResponse: boolean;
 }
 
 export interface MintAssetResponse {
+    /** The pending batch the asset was added to. */
+    pendingBatch: MintingBatch | undefined;
+}
+
+export interface MintingBatch {
     /**
      * A public key serialized in compressed format that can be used to uniquely
      * identify a pending minting batch. Responses that share the same key will be
      * batched into the same minting transaction.
      */
-    batchKey: Uint8Array | string;
-}
-
-export interface MintingBatch {
-    /** The internal public key of the batch. */
     batchKey: Uint8Array | string;
     /** The assets that are part of the batch. */
     assets: MintAsset[];
@@ -66,11 +74,20 @@ export interface MintingBatch {
     state: BatchState;
 }
 
-export interface FinalizeBatchRequest {}
+export interface FinalizeBatchRequest {
+    /**
+     * If true, then the assets currently in the batch won't be returned in the
+     * response. This is mainly to avoid a lot of data being transmitted and
+     * possibly printed on the command line in the case of a very large batch.
+     */
+    shortResponse: boolean;
+    /** The optional fee rate to use for the minting transaction, in sat/kw. */
+    feeRate: number;
+}
 
 export interface FinalizeBatchResponse {
-    /** The internal public key of the batch. */
-    batchKey: Uint8Array | string;
+    /** The finalized batch. */
+    batch: MintingBatch | undefined;
 }
 
 export interface CancelBatchRequest {}
@@ -101,7 +118,10 @@ export interface Mint {
     /**
      * tapcli: `assets mint`
      * MintAsset will attempt to mint the set of assets (async by default to
-     * ensure proper batching) specified in the request.
+     * ensure proper batching) specified in the request. The pending batch is
+     * returned that shows the other pending assets that are part of the next
+     * batch. This call will block until the operation succeeds (asset is staged
+     * in the batch) or fails.
      */
     mintAsset(
         request?: DeepPartial<MintAssetRequest>

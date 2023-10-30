@@ -75,7 +75,7 @@ service TaprootAssets {
     */
     rpc VerifyProof (ProofFile) returns (VerifyProofResponse);
 
-    /* tarocli: `proofs decode`
+    /* tapcli: `proofs decode`
     DecodeProof attempts to decode a given proof file into human readable
     format.
     */
@@ -87,13 +87,6 @@ service TaprootAssets {
     */
     rpc ExportProof (ExportProofRequest) returns (ProofFile);
 
-    /* tapcli: `proofs import`
-    ImportProof attempts to import a proof file into the daemon. If successful,
-    a new asset will be inserted on disk, spendable using the specified target
-    script key, and internal key.
-    */
-    rpc ImportProof (ImportProofRequest) returns (ImportProofResponse);
-
     /* tapcli: `assets send`
     SendAsset uses one or multiple passed Taproot Asset address(es) to attempt
     to complete an asset send. The method returns information w.r.t the on chain
@@ -101,6 +94,15 @@ service TaprootAssets {
     receive the asset.
     */
     rpc SendAsset (SendAssetRequest) returns (SendAssetResponse);
+
+    /* tapcli: `assets burn`
+    BurnAsset burns the given number of units of a given asset by sending them
+    to a provably un-spendable script key. Burning means irrevocably destroying
+    a certain number of assets, reducing the total supply of the asset. Because
+    burning is such a destructive and non-reversible operation, some specific
+    values need to be set in the request to avoid accidental burns.
+    */
+    rpc BurnAsset (BurnAssetRequest) returns (BurnAssetResponse);
 
     /* tapcli: `getinfo`
     GetInfo returns the information for the node.
@@ -148,7 +150,8 @@ enum AssetMetaType {
 message AssetMeta {
     /*
     The raw data of the asset meta data. Based on the type below, this may be
-    structured data such as a text file or PDF.
+    structured data such as a text file or PDF. The size of the data is limited
+    to 1MiB.
     */
     bytes data = 1;
 
@@ -165,6 +168,7 @@ message AssetMeta {
 message ListAssetRequest {
     bool with_witness = 1;
     bool include_spent = 2;
+    bool include_leased = 3;
 }
 
 message AnchorInfo {
@@ -237,13 +241,44 @@ message AssetGroup {
     */
     bytes tweaked_group_key = 2;
 
-    // A signature over the genesis point using the above key.
-    bytes asset_id_sig = 3;
+    /*
+    A witness that authorizes a specific asset to be part of the asset group
+    specified by the above key.
+    */
+    bytes asset_witness = 3;
+
+    // TODO(jhb): update to include tapscript_root
+}
+
+message GroupKeyReveal {
+    // The raw group key which is a normal public key.
+    bytes raw_group_key = 1;
+
+    // The tapscript root included in the tweaked group key, which may be empty.
+    bytes tapscript_root = 2;
+}
+
+message GenesisReveal {
+    // The base genesis information in the genesis reveal.
+    GenesisInfo genesis_base_reveal = 1;
+
+    // The asset type, not included in the base genesis info.
+    AssetType asset_type = 2;
+}
+
+enum AssetVersion {
+    // ASSET_VERSION_V0 is the default asset version. This version will include
+    // the witness vector in the leaf for a tap commitment.
+    ASSET_VERSION_V0 = 0;
+
+    // ASSET_VERSION_V1 is the asset version that leaves out the witness vector
+    // from the MS-SMT leaf encoding.
+    ASSET_VERSION_V1 = 1;
 }
 
 message Asset {
     // The version of the Taproot Asset.
-    int32 version = 1;
+    AssetVersion version = 1;
 
     // The base genesis information of an asset. This information never changes.
     GenesisInfo asset_genesis = 2;
@@ -280,6 +315,18 @@ message Asset {
 
     // Indicates whether the asset has been spent.
     bool is_spent = 14;
+
+    // If the asset has been leased, this is the owner (application ID) of the
+    // lease.
+    bytes lease_owner = 15;
+
+    // If the asset has been leased, this is the expiry of the lease as a Unix
+    // timestamp in seconds.
+    int64 lease_expiry = 16;
+
+    // Indicates whether this transfer was an asset burn. If true, the number of
+    // assets in this output are destroyed and can no longer be spent.
+    bool is_burn = 17;
 }
 
 message PrevWitness {
@@ -299,6 +346,7 @@ message ListAssetResponse {
 }
 
 message ListUtxosRequest {
+    bool include_leased = 1;
 }
 
 message ManagedUtxo {
@@ -354,6 +402,9 @@ message AssetHumanReadable {
 
     // The type of the asset.
     AssetType type = 7;
+
+    // The version of the asset.
+    AssetVersion version = 8;
 }
 
 message GroupedAssets {
@@ -490,6 +541,14 @@ enum OutputType {
     // change from a split or a tombstone from a non-interactive full value send
     // output, as well as passive assets.
     OUTPUT_TYPE_PASSIVE_SPLIT_ROOT = 3;
+
+    // OUTPUT_TYPE_SIMPLE_PASSIVE_ASSETS is a plain full-value interactive send
+    // output that also carries passive assets. This is a special case where we
+    // send the full value of a single asset in a commitment to a new script
+    // key, but also carry passive assets in the same output. This is useful for
+    // key rotation (send-to-self) scenarios or asset burns where we burn the
+    // full supply of a single asset within a commitment.
+    OUTPUT_TYPE_SIMPLE_PASSIVE_ASSETS = 4;
 }
 
 message TransferOutput {
@@ -501,11 +560,15 @@ message TransferOutput {
 
     uint64 amount = 4;
 
+    // The new individual transition proof (not a full proof file) that proves
+    // the inclusion of the new asset within the new AnchorTx.
     bytes new_proof_blob = 5;
 
     bytes split_commit_root_hash = 6;
 
     OutputType output_type = 7;
+
+    AssetVersion asset_version = 8;
 }
 
 message StopRequest {
@@ -563,6 +626,12 @@ message Addr {
     transfer assets described in this address.
     */
     bytes taproot_output_key = 9;
+
+    // The address of the proof courier service used in proof transfer.
+    string proof_courier_addr = 10;
+
+    // The asset version of the address.
+    AssetVersion asset_version = 11;
 }
 
 message QueryAddrRequest {
@@ -621,6 +690,17 @@ message NewAddrRequest {
     commitment of the asset.
     */
     bytes tapscript_sibling = 5;
+
+    /*
+    An optional proof courier address for use in proof transfer. If unspecified,
+    the daemon configured default address will be used.
+     */
+    string proof_courier_addr = 6;
+
+    /*
+    The asset version to use when sending/receiving to/from this address.
+    */
+    AssetVersion asset_version = 7;
 }
 
 message ScriptKey {
@@ -672,7 +752,9 @@ message DecodeAddrRequest {
 }
 
 message ProofFile {
-    bytes raw_proof = 1;
+    // The raw proof file encoded as bytes. Must be a file and not just an
+    // individual mint/transfer proof.
+    bytes raw_proof_file = 1;
 
     string genesis_point = 2;
 }
@@ -681,7 +763,9 @@ message DecodedProof {
     // The index depth of the decoded proof, with 0 being the latest proof.
     uint32 proof_at_depth = 1;
 
-    // The total number of proofs contained in the raw proof.
+    // The total number of proofs contained in the decoded proof file (this will
+    // always be 1 if a single mint/transition proof was given as the raw_proof
+    // instead of a file).
     uint32 number_of_proofs = 2;
 
     // The asset referenced in the proof.
@@ -718,18 +802,38 @@ message DecodedProof {
     // that the creator of the proof is able to produce a valid signature to
     // spend the asset.
     repeated bytes challenge_witness = 10;
+
+    // Indicates whether the state transition this proof represents is a burn,
+    // meaning that the assets were provably destroyed and can no longer be
+    // spent.
+    bool is_burn = 11;
+
+    // GenesisReveal is an optional field that is the Genesis information for
+    // the asset. This is required for minting proofs.
+    GenesisReveal genesis_reveal = 12;
+
+    // GroupKeyReveal is an optional field that includes the information needed
+    // to derive the tweaked group key.
+    GroupKeyReveal group_key_reveal = 13;
 }
 
 message VerifyProofResponse {
     bool valid = 1;
+
+    // The decoded last proof in the file if the proof file was valid.
     DecodedProof decoded_proof = 2;
 }
 
 message DecodeProofRequest {
-    // The raw proof in bytes to decode, which may contain multiple proofs.
+    // The raw proof bytes to decode. This can be a full proof file or a single
+    // mint/transition proof. If it is a full proof file, the proof_at_depth
+    // field will be used to determine which individual proof within the file to
+    // decode.
     bytes raw_proof = 1;
 
-    // The index depth of the decoded proof, with 0 being the latest proof.
+    // The index depth of the decoded proof, with 0 being the latest proof. This
+    // is ignored if the raw_proof is a single mint/transition proof and not a
+    // proof file.
     uint32 proof_at_depth = 2;
 
     // An option to include previous witnesses in decoding.
@@ -749,15 +853,6 @@ message ExportProofRequest {
 
     // TODO(roasbeef): specify information to make new state transition in proof
     // file?
-}
-
-message ImportProofRequest {
-    bytes proof_file = 1;
-
-    string genesis_point = 2;
-}
-
-message ImportProofResponse {
 }
 
 enum AddrEventStatus {
@@ -822,6 +917,8 @@ message AddrReceivesResponse {
 message SendAssetRequest {
     repeated string tap_addrs = 1;
 
+    // The optional fee rate to use for the minting transaction, in sat/kw.
+    uint32 fee_rate = 2;
     // TODO(roasbeef): maybe in future add details re type of ProofCourier or
     // w/e
 }
@@ -844,6 +941,11 @@ message GetInfoResponse {
     string version = 1;
     string lnd_version = 2;
     string network = 3;
+    string lnd_identity_pubkey = 4;
+    string node_alias = 5;
+    uint32 block_height = 6;
+    string block_hash = 7;
+    bool sync_to_chain = 8;
 }
 
 message SubscribeSendAssetEventNtfnsRequest {
@@ -888,5 +990,36 @@ message FetchAssetMetaRequest {
 
         // The 32-byte meta hash of the asset meta.
         bytes meta_hash = 2;
+
+        // The hex encoded asset ID of the asset to fetch the meta for.
+        string asset_id_str = 3;
+
+        // The hex encoded meta hash of the asset meta.
+        string meta_hash_str = 4;
     }
+}
+
+message BurnAssetRequest {
+    oneof asset {
+        // The asset ID of the asset to burn units of.
+        bytes asset_id = 1;
+
+        // The hex encoded asset ID of the asset to burn units of.
+        string asset_id_str = 2;
+    }
+
+    uint64 amount_to_burn = 3;
+
+    // A safety check to ensure the user is aware of the destructive nature of
+    // the burn. This needs to be set to the value "assets will be destroyed"
+    // for the burn to succeed.
+    string confirmation_text = 4;
+}
+
+message BurnAssetResponse {
+    // The asset transfer that contains the asset burn as an output.
+    AssetTransfer burn_transfer = 1;
+
+    // The burn transition proof for the asset burn output.
+    DecodedProof burn_proof = 2;
 }
