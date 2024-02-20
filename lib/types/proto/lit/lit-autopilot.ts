@@ -102,6 +102,11 @@ export interface Feature {
     requiresUpgrade: boolean;
     /** The JSON-marshaled representation of a feature's default configuration. */
     defaultConfig: string;
+    /**
+     * This feature may require relaxed privacy obfuscation that can be enabled
+     * with these flags.
+     */
+    privacyFlags: string;
 }
 
 export interface Feature_RulesEntry {

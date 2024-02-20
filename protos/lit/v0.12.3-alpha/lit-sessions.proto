@@ -265,6 +265,7 @@ message RuleValue {
         SendToSelf send_to_self = 6;
         ChannelRestrict channel_restrict = 7;
         PeerRestrict peer_restrict = 8;
+        ChannelConstraint channel_constraint = 9;
     }
 }
 
@@ -388,4 +389,21 @@ message PeerRestrict {
     A list of peer IDs that the Autopilot should _not_ perform any actions on.
     */
     repeated string peer_ids = 1;
+}
+
+message ChannelConstraint {
+    /*
+    The minimum channel size autopilot has to set for a channel.
+    */
+    uint64 min_capacity_sat = 1 [jstype = JS_STRING];
+
+    /*
+    The maximum channel size autopilot can set for a channel.
+    */
+    uint64 max_capacity_sat = 2 [jstype = JS_STRING];
+
+    /*
+    The maximum push amount for a channel.
+    */
+    uint64 max_push_sat = 3 [jstype = JS_STRING];
 }
