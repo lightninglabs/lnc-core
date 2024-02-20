@@ -24,6 +24,12 @@ export interface SubServerStatus {
      * starting up properly.
      */
     error: string;
+    /**
+     * custom_status details a custom state that the sub-server has entered,
+     * which is unique to the sub-server, and which is not the standard
+     * disabled, running or errored state.
+     */
+    customStatus: string;
 }
 
 /** The Status server can be used to query the state of various LiT sub-servers. */

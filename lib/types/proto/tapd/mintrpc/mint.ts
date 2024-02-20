@@ -1,9 +1,9 @@
 /* eslint-disable */
-import type { AssetType, AssetVersion, AssetMeta } from '../taprootassets';
+import type { AssetVersion, AssetType, AssetMeta } from '../taprootassets';
 
 export enum BatchState {
     BATCH_STATE_UNKNOWN = 'BATCH_STATE_UNKNOWN',
-    BATCH_STATE_PEDNING = 'BATCH_STATE_PEDNING',
+    BATCH_STATE_PENDING = 'BATCH_STATE_PENDING',
     BATCH_STATE_FROZEN = 'BATCH_STATE_FROZEN',
     BATCH_STATE_COMMITTED = 'BATCH_STATE_COMMITTED',
     BATCH_STATE_BROADCAST = 'BATCH_STATE_BROADCAST',
@@ -14,7 +14,9 @@ export enum BatchState {
     UNRECOGNIZED = 'UNRECOGNIZED'
 }
 
-export interface MintAsset {
+export interface PendingAsset {
+    /** The version of asset to mint. */
+    assetVersion: AssetVersion;
     /** The type of the asset to be created. */
     assetType: AssetType;
     /** The name, or "tag" of the asset. This will affect the final asset ID. */
@@ -29,6 +31,11 @@ export interface MintAsset {
      * AssetType is Collectible, then this field cannot be set.
      */
     amount: string;
+    /**
+     * If true, then the asset will be created with a new group key, which allows
+     * for future asset issuance.
+     */
+    newGroupedAsset: boolean;
     /** The specific group key this asset should be minted with. */
     groupKey: Uint8Array | string;
     /**
@@ -36,18 +43,47 @@ export interface MintAsset {
      * This asset will be minted with the same group key as the anchor asset.
      */
     groupAnchor: string;
+}
+
+export interface MintAsset {
     /** The version of asset to mint. */
     assetVersion: AssetVersion;
+    /** The type of the asset to be created. */
+    assetType: AssetType;
+    /** The name, or "tag" of the asset. This will affect the final asset ID. */
+    name: string;
+    /**
+     * A blob that resents metadata related to the asset. This will affect the
+     * final asset ID.
+     */
+    assetMeta: AssetMeta | undefined;
+    /**
+     * The total amount of units of the new asset that should be created. If the
+     * AssetType is Collectible, then this field cannot be set.
+     */
+    amount: string;
+    /**
+     * If true, then the asset will be created with a group key, which allows for
+     * future asset issuance.
+     */
+    newGroupedAsset: boolean;
+    /**
+     * If true, then a group key or group anchor can be set to mint this asset into
+     * an existing asset group.
+     */
+    groupedAsset: boolean;
+    /** The specific group key this asset should be minted with. */
+    groupKey: Uint8Array | string;
+    /**
+     * The name of the asset in the batch that will anchor a new asset group.
+     * This asset will be minted with the same group key as the anchor asset.
+     */
+    groupAnchor: string;
 }
 
 export interface MintAssetRequest {
     /** The asset to be minted. */
     asset: MintAsset | undefined;
-    /**
-     * If true, then the asset will be created with a group key, which allows for
-     * future asset issuance.
-     */
-    enableEmission: boolean;
     /**
      * If true, then the assets currently in the batch won't be returned in the
      * response. This is mainly to avoid a lot of data being transmitted and
@@ -68,10 +104,15 @@ export interface MintingBatch {
      * batched into the same minting transaction.
      */
     batchKey: Uint8Array | string;
-    /** The assets that are part of the batch. */
-    assets: MintAsset[];
+    /**
+     * The transaction ID of the batch. Only populated if the batch has been
+     * committed.
+     */
+    batchTxid: string;
     /** The state of the batch. */
     state: BatchState;
+    /** The assets that are part of the batch. */
+    assets: PendingAsset[];
 }
 
 export interface FinalizeBatchRequest {

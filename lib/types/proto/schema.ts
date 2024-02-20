@@ -70,5 +70,6 @@ export const subscriptionMethods = [
     'poolrpc.ChannelAuctioneer.SubscribeBatchAuction',
     'poolrpc.ChannelAuctioneer.SubscribeSidecar',
     'poolrpc.HashMail.RecvStream',
-    'taprpc.TaprootAssets.SubscribeSendAssetEventNtfns'
+    'taprpc.TaprootAssets.SubscribeSendAssetEventNtfns',
+    'taprpc.TaprootAssets.SubscribeReceiveAssetEventNtfns'
 ];
