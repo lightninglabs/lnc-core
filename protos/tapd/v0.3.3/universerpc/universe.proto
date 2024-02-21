@@ -28,12 +28,12 @@ service Universe {
     /* tapcli: `universe keys`
     AssetLeafKeys queries for the set of Universe keys associated with a given
     asset_id or group_key. Each key takes the form: (outpoint, script_key),
-    where outpoint is an outpoint in the Bitcoin blockcahin that anchors a
+    where outpoint is an outpoint in the Bitcoin blockchain that anchors a
     valid Taproot Asset commitment, and script_key is the script_key of
     the asset within the Taproot Asset commitment for the given asset_id or
     group_key.
     */
-    rpc AssetLeafKeys (ID) returns (AssetLeafKeyResponse);
+    rpc AssetLeafKeys (AssetLeafKeysRequest) returns (AssetLeafKeyResponse);
 
     /* tapcli: `universe leaves`
     AssetLeaves queries for the set of asset leaves (the values in the Universe
@@ -134,7 +134,7 @@ service Universe {
     rpc SetFederationSyncConfig (SetFederationSyncConfigRequest)
         returns (SetFederationSyncConfigResponse);
 
-    /*
+    /* tapcli: `universe federation config info`
     QueryFederationSyncConfig queries the universe federation sync configuration
     settings.
     */
@@ -143,6 +143,19 @@ service Universe {
 }
 
 message AssetRootRequest {
+    // If true, then the response will include the amounts for each asset ID
+    // of grouped assets.
+    bool with_amounts_by_id = 1;
+
+    // The offset for the page.
+    int32 offset = 2;
+
+    // The length limit for the page.
+    int32 limit = 3;
+
+    // The direction of the page.
+    SortDirection direction = 4;
+
     // TODO(roasbeef): filter by asset ID, etc?
 }
 
@@ -256,6 +269,20 @@ message AssetKey {
     }
 }
 
+message AssetLeafKeysRequest {
+    // The ID of the asset to query for.
+    ID id = 1;
+
+    // The offset for the page.
+    int32 offset = 2;
+
+    // The length limit for the page.
+    int32 limit = 3;
+
+    // The direction of the page.
+    SortDirection direction = 4;
+}
+
 message AssetLeafKeyResponse {
     // The set of asset leaf keys for the given asset ID or group key.
     repeated AssetKey asset_keys = 1;
@@ -267,10 +294,10 @@ message AssetLeaf {
 
     // TODO(roasbeef): only needed for display? can get from proof below ^
 
-    // The asset issuance proof, which proves that the asset specified above
-    // was issued properly. This is always just an individual mint/transfer
-    // proof and never a proof file.
-    bytes issuance_proof = 2;
+    // The asset issuance or transfer proof, which proves that the asset
+    // specified above was issued or transferred properly. This is always just
+    // an individual mint/transfer proof and never a proof file.
+    bytes proof = 2;
 }
 
 message AssetLeafResponse {
@@ -328,9 +355,6 @@ message InfoResponse {
     // server, changes with each restart. Mainly used to identify identical
     // servers when they are exposed under different hostnames/ports.
     int64 runtime_id = 1;
-
-    // The number of assets known to this Universe server.
-    uint64 num_assets = 2;
 }
 
 enum UniverseSyncMode {
@@ -500,6 +524,8 @@ message AssetStatsAsset {
     int32 genesis_height = 6;
 
     int64 genesis_timestamp = 7;
+
+    string anchor_point = 8;
 }
 
 message UniverseAssetStats {

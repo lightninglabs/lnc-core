@@ -86,6 +86,26 @@ export enum AddrEventStatus {
     UNRECOGNIZED = 'UNRECOGNIZED'
 }
 
+/**
+ * ProofTransferType is the type of proof transfer attempt. The transfer is
+ * either a proof delivery to the transfer counterparty or receiving a proof
+ * from the transfer counterparty. Note that the transfer counterparty is
+ * usually the proof courier service.
+ */
+export enum ProofTransferType {
+    /**
+     * PROOF_TRANSFER_TYPE_SEND - This value indicates that the proof transfer attempt is a delivery to the
+     * transfer counterparty.
+     */
+    PROOF_TRANSFER_TYPE_SEND = 'PROOF_TRANSFER_TYPE_SEND',
+    /**
+     * PROOF_TRANSFER_TYPE_RECEIVE - This value indicates that the proof transfer attempt is a receive from
+     * the transfer counterparty.
+     */
+    PROOF_TRANSFER_TYPE_RECEIVE = 'PROOF_TRANSFER_TYPE_RECEIVE',
+    UNRECOGNIZED = 'UNRECOGNIZED'
+}
+
 export interface AssetMeta {
     /**
      * The raw data of the asset meta data. Based on the type below, this may be
@@ -114,8 +134,6 @@ export interface AnchorInfo {
      *  resides.
      */
     anchorTx: Uint8Array | string;
-    /** The txid of the above transaction. */
-    anchorTxid: string;
     /** The block hash the contains the anchor transaction above. */
     anchorBlockHash: string;
     /** The outpoint (txid:vout) that stores the Taproot Asset commitment. */
@@ -147,6 +165,8 @@ export interface GenesisInfo {
     metaHash: Uint8Array | string;
     /** The asset ID that uniquely identifies the asset. */
     assetId: Uint8Array | string;
+    /** The type of the asset. */
+    assetType: AssetType;
     /**
      * The index of the output that carries the unique Taproot Asset commitment in
      * the genesis transaction.
@@ -181,8 +201,6 @@ export interface GroupKeyReveal {
 export interface GenesisReveal {
     /** The base genesis information in the genesis reveal. */
     genesisBaseReveal: GenesisInfo | undefined;
-    /** The asset type, not included in the base genesis info. */
-    assetType: AssetType;
 }
 
 export interface Asset {
@@ -190,8 +208,6 @@ export interface Asset {
     version: AssetVersion;
     /** The base genesis information of an asset. This information never changes. */
     assetGenesis: GenesisInfo | undefined;
-    /** The type of the asset. */
-    assetType: AssetType;
     /** The total amount of the asset stored in this Taproot Asset UTXO. */
     amount: string;
     /** An optional locktime, as with Bitcoin transactions. */
@@ -335,8 +351,6 @@ export interface ListBalancesRequest {
 export interface AssetBalance {
     /** The base genesis information of an asset. This information never changes. */
     assetGenesis: GenesisInfo | undefined;
-    /** The type of the asset. */
-    assetType: AssetType;
     /** The balance of the asset owned by the target daemon. */
     balance: string;
 }
@@ -679,6 +693,7 @@ export interface DecodeProofResponse {
 export interface ExportProofRequest {
     assetId: Uint8Array | string;
     scriptKey: Uint8Array | string;
+    outpoint: OutPoint | undefined;
 }
 
 export interface AddrEvent {
@@ -758,10 +773,10 @@ export interface SendAssetEvent {
     /** An event which indicates that a send state is about to be executed. */
     executeSendStateEvent: ExecuteSendStateEvent | undefined;
     /**
-     * An event which indicates that the proof send backoff wait period will
-     * start imminently.
+     * An event which indicates that the proof transfer backoff wait period
+     * will start imminently.
      */
-    receiverProofBackoffWaitEvent: ReceiverProofBackoffWaitEvent | undefined;
+    proofTransferBackoffWaitEvent: ProofTransferBackoffWaitEvent | undefined;
 }
 
 export interface ExecuteSendStateEvent {
@@ -771,7 +786,7 @@ export interface ExecuteSendStateEvent {
     sendState: string;
 }
 
-export interface ReceiverProofBackoffWaitEvent {
+export interface ProofTransferBackoffWaitEvent {
     /** Transfer attempt timestamp (microseconds). */
     timestamp: string;
     /** Backoff is the active backoff wait duration. */
@@ -782,6 +797,29 @@ export interface ReceiverProofBackoffWaitEvent {
      * receiver.
      */
     triesCounter: string;
+    /** The type of proof transfer attempt. */
+    transferType: ProofTransferType;
+}
+
+export interface SubscribeReceiveAssetEventNtfnsRequest {}
+
+export interface AssetReceiveCompleteEvent {
+    /** Event creation timestamp. */
+    timestamp: string;
+    /** The address that received the asset. */
+    address: Addr | undefined;
+    /** The outpoint of the transaction that was used to receive the asset. */
+    outpoint: string;
+}
+
+export interface ReceiveAssetEvent {
+    /**
+     * An event which indicates that the proof transfer backoff wait period
+     * will start imminently.
+     */
+    proofTransferBackoffWaitEvent: ProofTransferBackoffWaitEvent | undefined;
+    /** An event which indicates that an asset receive process has finished. */
+    assetReceiveCompleteEvent: AssetReceiveCompleteEvent | undefined;
 }
 
 export interface FetchAssetMetaRequest {
@@ -814,6 +852,13 @@ export interface BurnAssetResponse {
     burnTransfer: AssetTransfer | undefined;
     /** The burn transition proof for the asset burn output. */
     burnProof: DecodedProof | undefined;
+}
+
+export interface OutPoint {
+    /** Raw bytes representing the transaction id. */
+    txid: Uint8Array | string;
+    /** The index of the output on the transaction. */
+    outputIndex: number;
 }
 
 export interface TaprootAssets {
@@ -953,6 +998,16 @@ export interface TaprootAssets {
         onError?: (err: Error) => void
     ): void;
     /**
+     * SubscribeReceiveAssetEventNtfns registers a subscription to the event
+     * notification stream which relates to the asset receive process.
+     */
+    subscribeReceiveAssetEventNtfns(
+        request?: DeepPartial<SubscribeReceiveAssetEventNtfnsRequest>,
+        onMessage?: (msg: ReceiveAssetEvent) => void,
+        onError?: (err: Error) => void
+    ): void;
+    /**
+     * tapcli: `assets meta`
      * FetchAssetMeta allows a caller to fetch the reveal meta data for an asset
      * either by the asset ID for that asset, or a meta hash.
      */

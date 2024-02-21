@@ -47,8 +47,19 @@ export enum AssetTypeFilter {
     UNRECOGNIZED = 'UNRECOGNIZED'
 }
 
-/** TODO(roasbeef): filter by asset ID, etc? */
-export interface AssetRootRequest {}
+export interface AssetRootRequest {
+    /**
+     * If true, then the response will include the amounts for each asset ID
+     * of grouped assets.
+     */
+    withAmountsById: boolean;
+    /** The offset for the page. */
+    offset: number;
+    /** The length limit for the page. */
+    limit: number;
+    /** The direction of the page. */
+    direction: SortDirection;
+}
 
 export interface MerkleSumNode {
     /** The MS-SMT root hash for the branch node. */
@@ -148,6 +159,17 @@ export interface AssetKey {
     scriptKeyStr: string | undefined;
 }
 
+export interface AssetLeafKeysRequest {
+    /** The ID of the asset to query for. */
+    id: ID | undefined;
+    /** The offset for the page. */
+    offset: number;
+    /** The length limit for the page. */
+    limit: number;
+    /** The direction of the page. */
+    direction: SortDirection;
+}
+
 export interface AssetLeafKeyResponse {
     /** The set of asset leaf keys for the given asset ID or group key. */
     assetKeys: AssetKey[];
@@ -157,11 +179,11 @@ export interface AssetLeaf {
     /** The asset included in the leaf. */
     asset: Asset | undefined;
     /**
-     * The asset issuance proof, which proves that the asset specified above
-     * was issued properly. This is always just an individual mint/transfer
-     * proof and never a proof file.
+     * The asset issuance or transfer proof, which proves that the asset
+     * specified above was issued or transferred properly. This is always just
+     * an individual mint/transfer proof and never a proof file.
      */
-    issuanceProof: Uint8Array | string;
+    proof: Uint8Array | string;
 }
 
 export interface AssetLeafResponse {
@@ -216,8 +238,6 @@ export interface InfoResponse {
      * servers when they are exposed under different hostnames/ports.
      */
     runtimeId: string;
-    /** The number of assets known to this Universe server. */
-    numAssets: string;
 }
 
 export interface SyncTarget {
@@ -336,6 +356,7 @@ export interface AssetStatsAsset {
     assetType: AssetType;
     genesisHeight: number;
     genesisTimestamp: string;
+    anchorPoint: string;
 }
 
 export interface UniverseAssetStats {
@@ -446,12 +467,14 @@ export interface Universe {
      * tapcli: `universe keys`
      * AssetLeafKeys queries for the set of Universe keys associated with a given
      * asset_id or group_key. Each key takes the form: (outpoint, script_key),
-     * where outpoint is an outpoint in the Bitcoin blockcahin that anchors a
+     * where outpoint is an outpoint in the Bitcoin blockchain that anchors a
      * valid Taproot Asset commitment, and script_key is the script_key of
      * the asset within the Taproot Asset commitment for the given asset_id or
      * group_key.
      */
-    assetLeafKeys(request?: DeepPartial<ID>): Promise<AssetLeafKeyResponse>;
+    assetLeafKeys(
+        request?: DeepPartial<AssetLeafKeysRequest>
+    ): Promise<AssetLeafKeyResponse>;
     /**
      * tapcli: `universe leaves`
      * AssetLeaves queries for the set of asset leaves (the values in the Universe
@@ -552,6 +575,7 @@ export interface Universe {
         request?: DeepPartial<SetFederationSyncConfigRequest>
     ): Promise<SetFederationSyncConfigResponse>;
     /**
+     * tapcli: `universe federation config info`
      * QueryFederationSyncConfig queries the universe federation sync configuration
      * settings.
      */

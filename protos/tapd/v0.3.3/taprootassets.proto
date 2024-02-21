@@ -117,6 +117,13 @@ service TaprootAssets {
         returns (stream SendAssetEvent);
 
     /*
+    SubscribeReceiveAssetEventNtfns registers a subscription to the event
+    notification stream which relates to the asset receive process.
+    */
+    rpc SubscribeReceiveAssetEventNtfns (SubscribeReceiveAssetEventNtfnsRequest)
+        returns (stream ReceiveAssetEvent);
+
+    /* tapcli: `assets meta`
     FetchAssetMeta allows a caller to fetch the reveal meta data for an asset
     either by the asset ID for that asset, or a meta hash.
     */
@@ -176,9 +183,6 @@ message AnchorInfo {
     //  resides.
     bytes anchor_tx = 1;
 
-    // The txid of the above transaction.
-    string anchor_txid = 2;
-
     // The block hash the contains the anchor transaction above.
     string anchor_block_hash = 3;
 
@@ -221,14 +225,17 @@ message GenesisInfo {
     // The asset ID that uniquely identifies the asset.
     bytes asset_id = 4;
 
+    // The type of the asset.
+    AssetType asset_type = 5;
+
     /*
     The index of the output that carries the unique Taproot Asset commitment in
     the genesis transaction.
     */
-    uint32 output_index = 5;
+    uint32 output_index = 6;
 
     // The version of the Taproot Asset commitment that created this asset.
-    int32 version = 6;
+    int32 version = 7;
 }
 
 message AssetGroup {
@@ -261,9 +268,6 @@ message GroupKeyReveal {
 message GenesisReveal {
     // The base genesis information in the genesis reveal.
     GenesisInfo genesis_base_reveal = 1;
-
-    // The asset type, not included in the base genesis info.
-    AssetType asset_type = 2;
 }
 
 enum AssetVersion {
@@ -282,9 +286,6 @@ message Asset {
 
     // The base genesis information of an asset. This information never changes.
     GenesisInfo asset_genesis = 2;
-
-    // The type of the asset.
-    AssetType asset_type = 3;
 
     // The total amount of the asset stored in this Taproot Asset UTXO.
     uint64 amount = 4;
@@ -439,9 +440,6 @@ message ListBalancesRequest {
 message AssetBalance {
     // The base genesis information of an asset. This information never changes.
     GenesisInfo asset_genesis = 1;
-
-    // The type of the asset.
-    AssetType asset_type = 2;
 
     // The balance of the asset owned by the target daemon.
     uint64 balance = 3;
@@ -850,6 +848,7 @@ message DecodeProofResponse {
 message ExportProofRequest {
     bytes asset_id = 1;
     bytes script_key = 2;
+    OutPoint outpoint = 3;
 
     // TODO(roasbeef): specify information to make new state transition in proof
     // file?
@@ -956,9 +955,9 @@ message SendAssetEvent {
         // An event which indicates that a send state is about to be executed.
         ExecuteSendStateEvent execute_send_state_event = 1;
 
-        // An event which indicates that the proof send backoff wait period will
-        // start imminently.
-        ReceiverProofBackoffWaitEvent receiver_proof_backoff_wait_event = 2;
+        // An event which indicates that the proof transfer backoff wait period
+        // will start imminently.
+        ProofTransferBackoffWaitEvent proof_transfer_backoff_wait_event = 2;
     }
 }
 
@@ -970,7 +969,21 @@ message ExecuteSendStateEvent {
     string send_state = 2;
 }
 
-message ReceiverProofBackoffWaitEvent {
+// ProofTransferType is the type of proof transfer attempt. The transfer is
+// either a proof delivery to the transfer counterparty or receiving a proof
+// from the transfer counterparty. Note that the transfer counterparty is
+// usually the proof courier service.
+enum ProofTransferType {
+    // This value indicates that the proof transfer attempt is a delivery to the
+    // transfer counterparty.
+    PROOF_TRANSFER_TYPE_SEND = 0;
+
+    // This value indicates that the proof transfer attempt is a receive from
+    // the transfer counterparty.
+    PROOF_TRANSFER_TYPE_RECEIVE = 1;
+}
+
+message ProofTransferBackoffWaitEvent {
     // Transfer attempt timestamp (microseconds).
     int64 timestamp = 1;
 
@@ -981,6 +994,34 @@ message ReceiverProofBackoffWaitEvent {
     // course of the current backoff procedure to deliver the proof to the
     // receiver.
     int64 tries_counter = 3;
+
+    // The type of proof transfer attempt.
+    ProofTransferType transfer_type = 4;
+}
+
+message SubscribeReceiveAssetEventNtfnsRequest {
+}
+
+message AssetReceiveCompleteEvent {
+    // Event creation timestamp.
+    int64 timestamp = 1;
+
+    // The address that received the asset.
+    Addr address = 2;
+
+    // The outpoint of the transaction that was used to receive the asset.
+    string outpoint = 3;
+}
+
+message ReceiveAssetEvent {
+    oneof event {
+        // An event which indicates that the proof transfer backoff wait period
+        // will start imminently.
+        ProofTransferBackoffWaitEvent proof_transfer_backoff_wait_event = 1;
+
+        // An event which indicates that an asset receive process has finished.
+        AssetReceiveCompleteEvent asset_receive_complete_event = 2;
+    }
 }
 
 message FetchAssetMetaRequest {
@@ -1022,4 +1063,16 @@ message BurnAssetResponse {
 
     // The burn transition proof for the asset burn output.
     DecodedProof burn_proof = 2;
+}
+
+message OutPoint {
+    /*
+    Raw bytes representing the transaction id.
+    */
+    bytes txid = 1;
+
+    /*
+    The index of the output on the transaction.
+    */
+    uint32 output_index = 2;
 }
