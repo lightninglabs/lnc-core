@@ -9,8 +9,8 @@
     "loop_release_tag": "v0.28.5-beta",
     "pool_release_tag": "v0.6.5-beta",
     "faraday_release_tag": "v0.2.13-alpha",
-    "tapd_release_tag": "v0-3-3-lnd-18",
-    "lit_release_tag": "v0.13.2-alpha",
+    "tapd_release_tag": "v0.5.0",
+    "lit_release_tag": "v0.14.0-alpha",
     "protoc_version": "21.9"
   },
   "scripts": {
