@@ -73,8 +73,17 @@ export enum CommitmentType {
      * channel before its maturity date.
      */
     SCRIPT_ENFORCED_LEASE = 'SCRIPT_ENFORCED_LEASE',
-    /** SIMPLE_TAPROOT - TODO(roasbeef): need script enforce mirror type for the above as well? */
+    /**
+     * SIMPLE_TAPROOT - A channel that uses musig2 for the funding output, and the new tapscript
+     * features where relevant.
+     */
     SIMPLE_TAPROOT = 'SIMPLE_TAPROOT',
+    /**
+     * SIMPLE_TAPROOT_OVERLAY - Identical to the SIMPLE_TAPROOT channel type, but with extra functionality.
+     * This channel type also commits to additional meta data in the tapscript
+     * leaves for the scripts in a channel.
+     */
+    SIMPLE_TAPROOT_OVERLAY = 'SIMPLE_TAPROOT_OVERLAY',
     UNRECOGNIZED = 'UNRECOGNIZED'
 }
 
@@ -164,6 +173,8 @@ export enum PaymentFailureReason {
     FAILURE_REASON_INCORRECT_PAYMENT_DETAILS = 'FAILURE_REASON_INCORRECT_PAYMENT_DETAILS',
     /** FAILURE_REASON_INSUFFICIENT_BALANCE - Insufficient local balance. */
     FAILURE_REASON_INSUFFICIENT_BALANCE = 'FAILURE_REASON_INSUFFICIENT_BALANCE',
+    /** FAILURE_REASON_CANCELED - The payment was canceled. */
+    FAILURE_REASON_CANCELED = 'FAILURE_REASON_CANCELED',
     UNRECOGNIZED = 'UNRECOGNIZED'
 }
 
@@ -729,9 +740,8 @@ export interface SendCoinsRequest {
      */
     satPerByte: string;
     /**
-     * If set, then the amount field will be ignored, and lnd will attempt to
-     * send all the coins under control of the internal wallet to the specified
-     * address.
+     * If set, the amount field should be unset. It indicates lnd will send all
+     * wallet coins or all selected coins to the specified address.
      */
     sendAll: boolean;
     /** An optional label for the transaction, limited to 500 characters. */
@@ -745,6 +755,8 @@ export interface SendCoinsRequest {
     spendUnconfirmed: boolean;
     /** The strategy to use for selecting coins. */
     coinSelectionStrategy: CoinSelectionStrategy;
+    /** A list of selected outpoints as inputs for the transaction. */
+    outpoints: OutPoint[];
 }
 
 export interface SendCoinsResponse {
@@ -1027,6 +1039,8 @@ export interface Channel {
      * the channel's operation.
      */
     memo: string;
+    /** Custom channel data that might be populated in custom channels. */
+    customChannelData: Uint8Array | string;
 }
 
 export interface ListChannelsRequest {
@@ -1356,9 +1370,39 @@ export interface ChannelOpenUpdate {
     channelPoint: ChannelPoint | undefined;
 }
 
+export interface CloseOutput {
+    /**
+     * The amount in satoshi of this close output. This amount is the final
+     * commitment balance of the channel and the actual amount paid out on chain
+     * might be smaller due to subtracted fees.
+     */
+    amountSat: string;
+    /** The pkScript of the close output. */
+    pkScript: Uint8Array | string;
+    /** Whether this output is for the local or remote node. */
+    isLocal: boolean;
+    /**
+     * The TLV encoded custom channel data records for this output, which might
+     * be set for custom channels.
+     */
+    customChannelData: Uint8Array | string;
+}
+
 export interface ChannelCloseUpdate {
     closingTxid: Uint8Array | string;
     success: boolean;
+    /**
+     * The local channel close output. If the local channel balance was dust to
+     * begin with, this output will not be set.
+     */
+    localCloseOutput: CloseOutput | undefined;
+    /**
+     * The remote channel close output. If the remote channel balance was dust
+     * to begin with, this output will not be set.
+     */
+    remoteCloseOutput: CloseOutput | undefined;
+    /** Any additional outputs that might be added for custom channel types. */
+    additionalOutputs: CloseOutput[];
 }
 
 export interface CloseChannelRequest {
@@ -1991,6 +2035,8 @@ export interface PendingChannelsResponse_PendingChannel {
      * impacts the channel's operation.
      */
     memo: string;
+    /** Custom channel data that might be populated in custom channels. */
+    customChannelData: Uint8Array | string;
 }
 
 export interface PendingChannelsResponse_PendingOpenChannel {
@@ -2212,6 +2258,11 @@ export interface ChannelBalanceResponse {
     pendingOpenLocalBalance: Amount | undefined;
     /** Sum of channels pending remote balances. */
     pendingOpenRemoteBalance: Amount | undefined;
+    /**
+     * Custom channel data that might be populated if there are custom channels
+     * present.
+     */
+    customChannelData: Uint8Array | string;
 }
 
 export interface QueryRoutesRequest {
@@ -2507,6 +2558,16 @@ export interface Route {
     totalFeesMsat: string;
     /** The total amount in millisatoshis. */
     totalAmtMsat: string;
+    /**
+     * The actual on-chain amount that was sent out to the first hop. This value is
+     * only different from the total_amt_msat field if this is a custom channel
+     * payment and the value transported in the HTLC is different from the BTC
+     * amount in the HTLC. If this value is zero, then this is an old payment that
+     * didn't have this value yet and can be ignored.
+     */
+    firstHopAmountMsat: string;
+    /** Custom channel data that might be populated in custom channels. */
+    customChannelData: Uint8Array | string;
 }
 
 export interface NodeInfoRequest {
@@ -2666,6 +2727,11 @@ export interface ChanInfoRequest {
      * output index for the channel.
      */
     chanId: string;
+    /**
+     * The channel point of the channel in format funding_txid:output_index. If
+     * chan_id is specified, this field is ignored.
+     */
+    chanPoint: string;
 }
 
 export interface NetworkInfoRequest {}
@@ -3006,6 +3072,17 @@ export interface Invoice {
      * Note: Output only, don't specify for creating an invoice.
      */
     ampInvoiceState: { [key: string]: AMPInvoiceState };
+    /**
+     * Signals that the invoice should include blinded paths to hide the true
+     * identity of the recipient.
+     */
+    isBlinded: boolean;
+    /**
+     * Config values to use when creating blinded paths for this invoice. These
+     * can be used to override the defaults config values provided in by the
+     * global config. This field is only used if is_blinded is true.
+     */
+    blindedPathConfig: BlindedPathConfig | undefined;
 }
 
 export enum Invoice_InvoiceState {
@@ -3024,6 +3101,30 @@ export interface Invoice_FeaturesEntry {
 export interface Invoice_AmpInvoiceStateEntry {
     key: string;
     value: AMPInvoiceState | undefined;
+}
+
+export interface BlindedPathConfig {
+    /**
+     * The minimum number of real hops to include in a blinded path. This doesn't
+     * include our node, so if the minimum is 1, then the path will contain at
+     * minimum our node along with an introduction node hop. If it is zero then
+     * the shortest path will use our node as an introduction node.
+     */
+    minNumRealHops?: number | undefined;
+    /**
+     * The number of hops to include in a blinded path. This doesn't include our
+     * node, so if it is 1, then the path will contain our node along with an
+     * introduction node or dummy node hop. If paths shorter than NumHops is
+     * found, then they will be padded using dummy hops.
+     */
+    numHops?: number | undefined;
+    /** The maximum number of blinded paths to select and add to an invoice. */
+    maxNumPaths?: number | undefined;
+    /**
+     * A list of node IDs of nodes that should not be used in any of our generated
+     * blinded paths.
+     */
+    nodeOmissionList: Uint8Array | string[];
 }
 
 /** Details of an HTLC that paid to an invoice */
@@ -3050,6 +3151,8 @@ export interface InvoiceHTLC {
     mppTotalAmtMsat: string;
     /** Details relevant to AMP HTLCs, only populated if this is an AMP HTLC. */
     amp: AMP | undefined;
+    /** Custom channel data that might be populated in custom channels. */
+    customChannelData: Uint8Array | string;
 }
 
 export interface InvoiceHTLC_CustomRecordsEntry {
@@ -3232,6 +3335,11 @@ export interface Payment {
      */
     paymentIndex: string;
     failureReason: PaymentFailureReason;
+    /**
+     * The custom TLV records that were sent to the first hop as part of the HTLC
+     * wire message for this payment.
+     */
+    firstHopCustomRecords: { [key: string]: Uint8Array | string };
 }
 
 export enum Payment_PaymentStatus {
@@ -3250,6 +3358,11 @@ export enum Payment_PaymentStatus {
     /** INITIATED - Payment is created and has not attempted any HTLCs. */
     INITIATED = 'INITIATED',
     UNRECOGNIZED = 'UNRECOGNIZED'
+}
+
+export interface Payment_FirstHopCustomRecordsEntry {
+    key: string;
+    value: Uint8Array | string;
 }
 
 export interface HTLCAttempt {
@@ -3408,6 +3521,7 @@ export interface PayReq {
     paymentAddr: Uint8Array | string;
     numMsat: string;
     features: { [key: number]: Feature };
+    blindedPaths: BlindedPaymentPath[];
 }
 
 export interface PayReq_FeaturesEntry {

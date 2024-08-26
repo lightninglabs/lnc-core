@@ -682,6 +682,8 @@ export interface EstimateFeeResponse {
      * confirmation target in the request.
      */
     satPerKw: string;
+    /** The current minimum relay fee based on our chain backend in sat/kw. */
+    minRelayFeeSatPerKw: string;
 }
 
 export interface PendingSweep {

@@ -52,6 +52,7 @@ export const subscriptionMethods = [
     'chainrpc.ChainNotifier.RegisterSpendNtfn',
     'chainrpc.ChainNotifier.RegisterBlockEpochNtfn',
     'invoicesrpc.Invoices.SubscribeSingleInvoice',
+    'invoicesrpc.Invoices.HtlcModifier',
     'lnrpc.Lightning.SubscribeTransactions',
     'lnrpc.Lightning.SubscribePeerEvents',
     'lnrpc.Lightning.SubscribeChannelEvents',
