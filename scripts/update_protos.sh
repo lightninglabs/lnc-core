@@ -49,6 +49,10 @@ curl ${FARADAY_URL}/${FARADAY_RELEASE_TAG}/frdrpc/faraday.proto --create-dirs -o
 curl ${TAPD_URL}/${TAPD_RELEASE_TAG}/taprpc/taprootassets.proto --create-dirs -o protos/tapd/${TAPD_RELEASE_TAG}/taprootassets.proto
 curl ${TAPD_URL}/${TAPD_RELEASE_TAG}/taprpc/assetwalletrpc/assetwallet.proto --create-dirs -o protos/tapd/${TAPD_RELEASE_TAG}/assetwalletrpc/assetwallet.proto
 curl ${TAPD_URL}/${TAPD_RELEASE_TAG}/taprpc/mintrpc/mint.proto --create-dirs -o protos/tapd/${TAPD_RELEASE_TAG}/mintrpc/mint.proto
+curl ${TAPD_URL}/${TAPD_RELEASE_TAG}/taprpc/priceoraclerpc/price_oracle.proto --create-dirs -o protos/tapd/${TAPD_RELEASE_TAG}/priceoraclerpc/price_oracle.proto
+curl ${TAPD_URL}/${TAPD_RELEASE_TAG}/taprpc/rfqrpc/rfq.proto --create-dirs -o protos/tapd/${TAPD_RELEASE_TAG}/rfqrpc/rfq.proto
+curl ${TAPD_URL}/${TAPD_RELEASE_TAG}/taprpc/tapchannelrpc/tapchannel.proto --create-dirs -o protos/tapd/${TAPD_RELEASE_TAG}/tapchannelrpc/tapchannel.proto
+curl ${TAPD_URL}/${TAPD_RELEASE_TAG}/taprpc/tapdevrpc/tapdev.proto --create-dirs -o protos/tapd/${TAPD_RELEASE_TAG}/tapdevrpc/tapdev.proto
 curl ${TAPD_URL}/${TAPD_RELEASE_TAG}/taprpc/universerpc/universe.proto --create-dirs -o protos/tapd/${TAPD_RELEASE_TAG}/universerpc/universe.proto
 
 curl ${LIT_URL}/${LIT_RELEASE_TAG}/litrpc/firewall.proto --create-dirs -o protos/lit/${LIT_RELEASE_TAG}/firewall.proto

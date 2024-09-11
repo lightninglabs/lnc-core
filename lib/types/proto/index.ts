@@ -13,6 +13,10 @@ import * as looprpc from './looprpc';
 import * as poolrpc from './poolrpc';
 import * as assetwalletrpc from './assetwalletrpc';
 import * as mintrpc from './mintrpc';
+import * as priceoraclerpc from './priceoraclerpc';
+import * as rfqrpc from './rfqrpc';
+import * as tapchannelrpc from './tapchannelrpc';
+import * as tapdevrpc from './tapdevrpc';
 import * as taprpc from './taprpc';
 import * as universerpc from './universerpc';
 export {
@@ -31,6 +35,10 @@ export {
     poolrpc,
     assetwalletrpc,
     mintrpc,
+    priceoraclerpc,
+    rfqrpc,
+    tapchannelrpc,
+    tapdevrpc,
     taprpc,
     universerpc
 };
