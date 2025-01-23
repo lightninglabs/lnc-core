@@ -45,7 +45,7 @@ else
 fi
 
 curl -L ${PROTOC_URL} -o "protoc-${PROTOC_VERSION}.zip"
-unzip "protoc-${PROTOC_VERSION}.zip" -d protoc
+unzip -o "protoc-${PROTOC_VERSION}.zip" -d protoc
 rm "protoc-${PROTOC_VERSION}.zip"
 
 TS_PROTO_OPTIONS="\
@@ -112,12 +112,17 @@ echo "TAPD: running protoc..."
 mkdir -p "$GENERATED_TYPES_DIR/tapd"
 protoc/bin/protoc \
   --proto_path=protos/tapd/${TAPD_RELEASE_TAG} \
+  --proto_path=protos/lnd/${LND_RELEASE_TAG} \
   --plugin=./node_modules/.bin/protoc-gen-ts_proto \
   --ts_proto_out=$GENERATED_TYPES_DIR/tapd \
   $TS_PROTO_OPTIONS \
   taprootassets.proto \
   assetwalletrpc/assetwallet.proto \
   mintrpc/mint.proto \
+  priceoraclerpc/price_oracle.proto \
+  rfqrpc/rfq.proto \
+  tapchannelrpc/tapchannel.proto \
+  tapdevrpc/tapdev.proto \
   universerpc/universe.proto
 
 echo "LiT: running protoc..."
@@ -201,12 +206,17 @@ echo "TAPD: generating schema..."
 mkdir -p "$SCHEMA_DIR/tapd"
 protoc/bin/protoc \
   --proto_path=protos/tapd/${TAPD_RELEASE_TAG} \
+  --proto_path=protos/lnd/${LND_RELEASE_TAG} \
   --plugin=./node_modules/.bin/protoc-gen-ts_proto \
   --ts_proto_out=$SCHEMA_DIR/tapd \
   $SCHEMA_PROTO_OPTIONS \
   taprootassets.proto \
   assetwalletrpc/assetwallet.proto \
   mintrpc/mint.proto \
+  priceoraclerpc/price_oracle.proto \
+  rfqrpc/rfq.proto \
+  tapchannelrpc/tapchannel.proto \
+  tapdevrpc/tapdev.proto \
   universerpc/universe.proto
 
 echo "LIT: generating schema..."
