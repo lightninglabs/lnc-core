@@ -255,7 +255,10 @@ export interface SendCustomMessageRequest {
     data: Uint8Array | string;
 }
 
-export interface SendCustomMessageResponse {}
+export interface SendCustomMessageResponse {
+    /** The status of the send operation. */
+    status: string;
+}
 
 export interface Utxo {
     /** The type of address */
@@ -335,11 +338,31 @@ export interface GetTransactionsRequest {
     endHeight: number;
     /** An optional filter to only include transactions relevant to an account. */
     account: string;
+    /**
+     * The index of a transaction that will be used in a query to determine which
+     * transaction should be returned in the response.
+     */
+    indexOffset: number;
+    /**
+     * The maximal number of transactions returned in the response to this query.
+     * This value should be set to 0 to return all transactions.
+     */
+    maxTransactions: number;
 }
 
 export interface TransactionDetails {
     /** The list of transactions relevant to the wallet. */
     transactions: Transaction[];
+    /**
+     * The index of the last item in the set of returned transactions. This can be
+     * used to seek further, pagination style.
+     */
+    lastIndex: string;
+    /**
+     * The index of the last item in the set of returned transactions. This can be
+     * used to seek backwards, pagination style.
+     */
+    firstIndex: string;
 }
 
 export interface FeeLimit {
@@ -843,14 +866,20 @@ export interface ConnectPeerRequest {
     timeout: string;
 }
 
-export interface ConnectPeerResponse {}
+export interface ConnectPeerResponse {
+    /** The status of the connect operation. */
+    status: string;
+}
 
 export interface DisconnectPeerRequest {
     /** The pubkey of the node to disconnect from */
     pubKey: string;
 }
 
-export interface DisconnectPeerResponse {}
+export interface DisconnectPeerResponse {
+    /** The status of the disconnect operation. */
+    status: string;
+}
 
 export interface HTLC {
     incoming: boolean;
@@ -871,6 +900,12 @@ export interface HTLC {
     forwardingChannel: string;
     /** Index identifying the htlc on the forwarding channel. */
     forwardingHtlcIndex: string;
+    /**
+     * Whether the HTLC is locked in. An HTLC is considered locked in when the
+     * remote party has sent us the `revoke_and_ack` to irrevocably commit this
+     * HTLC.
+     */
+    lockedIn: boolean;
 }
 
 export interface ChannelConstraints {
@@ -1125,6 +1160,11 @@ export interface ChannelCloseSummary {
     aliasScids: string[];
     /** The confirmed SCID for a zero-conf channel. */
     zeroConfConfirmedScid: string;
+    /**
+     * The TLV encoded custom channel data records for this output, which might
+     * be set for custom channels.
+     */
+    customChannelData: Uint8Array | string;
 }
 
 export enum ChannelCloseSummary_ClosureType {
@@ -1295,8 +1335,8 @@ export interface GetInfoResponse {
     /** Whether we consider ourselves synced with the public channel graph. */
     syncedToGraph: boolean;
     /**
-     * Whether the current node is connected to testnet. This field is
-     * deprecated and the network field should be used instead
+     * Whether the current node is connected to testnet or testnet4. This field is
+     * deprecated and the network field should be used instead.
      *
      * @deprecated
      */
@@ -1449,9 +1489,13 @@ export interface CloseChannelRequest {
      */
     maxFeePerVbyte: string;
     /**
-     * If true, then the rpc call will not block while it awaits a closing txid.
-     * Consequently this RPC call will not return a closing txid if this value
-     * is set.
+     * If true, then the rpc call will not block while it awaits a closing txid
+     * to be broadcasted to the mempool. To obtain the closing tx one has to
+     * listen to the stream for the particular updates. Moreover if a coop close
+     * is specified and this flag is set to true the coop closing flow will be
+     * initiated even if HTLCs are active on the channel. The channel will wait
+     * until all HTLCs are resolved and then start the coop closing process. The
+     * channel will be disabled in the meantime and will disallow any new HTLCs.
      */
     noWait: boolean;
 }
@@ -1465,9 +1509,18 @@ export interface CloseStatusUpdate {
 export interface PendingUpdate {
     txid: Uint8Array | string;
     outputIndex: number;
+    feePerVbyte: string;
+    localCloseTx: boolean;
 }
 
-export interface InstantUpdate {}
+export interface InstantUpdate {
+    /**
+     * The number of pending HTLCs that are currently active on the channel.
+     * These HTLCs need to be resolved before the channel can be closed
+     * cooperatively.
+     */
+    numPendingHtlcs: number;
+}
 
 export interface ReadyForPsbtFunding {
     /**
@@ -2753,7 +2806,10 @@ export interface NetworkInfo {
 
 export interface StopRequest {}
 
-export interface StopResponse {}
+export interface StopResponse {
+    /** The status of the stop operation. */
+    status: string;
+}
 
 export interface GraphTopologySubscription {}
 
@@ -3476,9 +3532,15 @@ export interface DeleteAllPaymentsRequest {
     allPayments: boolean;
 }
 
-export interface DeletePaymentResponse {}
+export interface DeletePaymentResponse {
+    /** The status of the delete operation. */
+    status: string;
+}
 
-export interface DeleteAllPaymentsResponse {}
+export interface DeleteAllPaymentsResponse {
+    /** The status of the delete operation. */
+    status: string;
+}
 
 export interface AbandonChannelRequest {
     channelPoint: ChannelPoint | undefined;
@@ -3491,7 +3553,10 @@ export interface AbandonChannelRequest {
     iKnowWhatIAmDoing: boolean;
 }
 
-export interface AbandonChannelResponse {}
+export interface AbandonChannelResponse {
+    /** The status of the abandon operation. */
+    status: string;
+}
 
 export interface DebugLevelRequest {
     show: boolean;
@@ -3632,6 +3697,16 @@ export interface PolicyUpdateRequest {
      * retained [EXPERIMENTAL].
      */
     inboundFee: InboundFee | undefined;
+    /**
+     * Under unknown circumstances a channel can exist with a missing edge in
+     * the graph database. This can cause an 'edge not found' error when calling
+     * `getchaninfo` and/or cause the default channel policy to be used during
+     * forwards. Setting this flag will recreate the edge if not found, allowing
+     * updating this channel policy and fixing the missing edge problem for this
+     * channel permanently. For fields not set in this command, the default
+     * policy will be created.
+     */
+    createMissingEdge: boolean;
 }
 
 export interface FailedUpdate {
@@ -3798,11 +3873,16 @@ export interface RestoreChanBackupRequest {
     multiChanBackup: Uint8Array | string | undefined;
 }
 
-export interface RestoreBackupResponse {}
+export interface RestoreBackupResponse {
+    /** The number of channels successfully restored. */
+    numRestored: number;
+}
 
 export interface ChannelBackupSubscription {}
 
-export interface VerifyChanBackupResponse {}
+export interface VerifyChanBackupResponse {
+    chanPoints: string[];
+}
 
 export interface MacaroonPermission {
     /** The entity a permission grants access to. */
@@ -4078,6 +4158,24 @@ export interface RPCMiddlewareRequest {
      * intercept message.
      */
     msgId: string;
+    /**
+     * The metadata pairs that were sent along with the original gRPC request via
+     * the golang context.Context using explicit [gRPC
+     * metadata](https://grpc.io/docs/guides/metadata/). Context values are not
+     * propagated via gRPC and so we send any pairs along explicitly here so that
+     * the interceptor can access them.
+     */
+    metadataPairs: { [key: string]: MetadataValues };
+}
+
+export interface RPCMiddlewareRequest_MetadataPairsEntry {
+    key: string;
+    value: MetadataValues | undefined;
+}
+
+export interface MetadataValues {
+    /** The set of metadata values that correspond to the metadata key. */
+    values: string[];
 }
 
 export interface StreamAuth {
@@ -4501,10 +4599,12 @@ export interface Lightning {
         onError?: (err: Error) => void
     ): void;
     /**
-     * SendPaymentSync is the synchronous non-streaming version of SendPayment.
-     * This RPC is intended to be consumed by clients of the REST proxy.
-     * Additionally, this RPC expects the destination's public key and the payment
-     * hash (if any) to be encoded as hex strings.
+     * Deprecated, use routerrpc.SendPaymentV2. SendPaymentSync is the synchronous
+     * non-streaming version of SendPayment. This RPC is intended to be consumed by
+     * clients of the REST proxy. Additionally, this RPC expects the destination's
+     * public key and the payment hash (if any) to be encoded as hex strings.
+     *
+     * @deprecated
      */
     sendPaymentSync(request?: DeepPartial<SendRequest>): Promise<SendResponse>;
     /**
@@ -4523,8 +4623,11 @@ export interface Lightning {
         onError?: (err: Error) => void
     ): void;
     /**
-     * SendToRouteSync is a synchronous version of SendToRoute. It Will block
-     * until the payment either fails or succeeds.
+     * Deprecated, use routerrpc.SendToRouteV2. SendToRouteSync is a synchronous
+     * version of SendToRoute. It Will block until the payment either fails or
+     * succeeds.
+     *
+     * @deprecated
      */
     sendToRouteSync(
         request?: DeepPartial<SendToRouteRequest>

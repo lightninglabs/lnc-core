@@ -3,6 +3,7 @@ import type {
     CoinSelectionStrategy,
     Utxo,
     OutPoint,
+    ChannelPoint,
     TransactionDetails,
     Transaction as Transaction1
 } from '../lightning';
@@ -297,7 +298,10 @@ export interface ReleaseOutputRequest {
     outpoint: OutPoint | undefined;
 }
 
-export interface ReleaseOutputResponse {}
+export interface ReleaseOutputResponse {
+    /** The status of the release operation. */
+    status: string;
+}
 
 export interface KeyReq {
     /**
@@ -555,7 +559,10 @@ export interface ImportPublicKeyRequest {
     addressType: AddressType;
 }
 
-export interface ImportPublicKeyResponse {}
+export interface ImportPublicKeyResponse {
+    /** The status of the import operation. */
+    status: string;
+}
 
 export interface ImportTapscriptRequest {
     /** The internal public key, serialized as 32-byte x-only public key. */
@@ -755,6 +762,11 @@ export interface PendingSweep {
     budget: string;
     /** The deadline height used for this output when perform fee bumping. */
     deadlineHeight: number;
+    /**
+     * The block height which the input's locktime will expire at. Zero if the
+     * input has no locktime.
+     */
+    maturityHeight: number;
 }
 
 export interface PendingSweepsRequest {}
@@ -768,9 +780,8 @@ export interface BumpFeeRequest {
     /** The input we're attempting to bump the fee of. */
     outpoint: OutPoint | undefined;
     /**
-     * Optional. The deadline in number of blocks that the input should be spent
-     * within. When not set, for new inputs, the default value (1008) is used;
-     * for existing inputs, their current values will be retained.
+     * Optional. The conf target the underlying fee estimator will use to
+     * estimate the starting fee rate for the fee function.
      */
     targetConf: number;
     /**
@@ -798,7 +809,7 @@ export interface BumpFeeRequest {
     satPerVbyte: string;
     /**
      * Optional. Whether this input will be swept immediately. When set to true,
-     * the sweeper will sweep this input without waiting for the next batch.
+     * the sweeper will sweep this input without waiting for the next block.
      */
     immediate: boolean;
     /**
@@ -810,10 +821,63 @@ export interface BumpFeeRequest {
      * retained.
      */
     budget: string;
+    /**
+     * Optional. The deadline delta in number of blocks that the output
+     * should be spent within. This translates internally to the width of the
+     * fee function that the sweeper will use to bump the fee rate. When the
+     * deadline is reached, ALL the budget will be spent as fees.
+     */
+    deadlineDelta: number;
 }
 
 export interface BumpFeeResponse {
     /** The status of the bump fee operation. */
+    status: string;
+}
+
+export interface BumpForceCloseFeeRequest {
+    /**
+     * The channel point which force close transaction we are attempting to
+     * bump the fee rate for.
+     */
+    chanPoint: ChannelPoint | undefined;
+    /**
+     * Optional. The deadline delta in number of blocks that the anchor output
+     * should be spent within to bump the closing transaction. When the
+     * deadline is reached, ALL the budget will be spent as fees
+     */
+    deadlineDelta: number;
+    /**
+     * Optional. The starting fee rate, expressed in sat/vbyte. This value will be
+     * used by the sweeper's fee function as its starting fee rate. When not set,
+     * the sweeper will use the estimated fee rate using the target_conf as the
+     * starting fee rate.
+     */
+    startingFeerate: string;
+    /**
+     * Optional. Whether this cpfp transaction will be triggered immediately. When
+     * set to true, the sweeper will consider all currently registered sweeps and
+     * trigger new batch transactions including the sweeping of the anchor output
+     * related to the selected force close transaction.
+     */
+    immediate: boolean;
+    /**
+     * Optional. The max amount in sats that can be used as the fees. For already
+     * registered anchor outputs if not set explicitly the old value will be used.
+     * For channel force closes which have no HTLCs in their commitment transaction
+     * this value has to be set to an appropriate amount to pay for the cpfp
+     * transaction of the force closed channel otherwise the fee bumping will fail.
+     */
+    budget: string;
+    /**
+     * Optional. The conf target the underlying fee estimator will use to
+     * estimate the starting fee rate for the fee function.
+     */
+    targetConf: number;
+}
+
+export interface BumpForceCloseFeeResponse {
+    /** The status of the force close fee bump operation. */
     status: string;
 }
 
@@ -858,7 +922,10 @@ export interface LabelTransactionRequest {
     overwrite: boolean;
 }
 
-export interface LabelTransactionResponse {}
+export interface LabelTransactionResponse {
+    /** The status of the label operation. */
+    status: string;
+}
 
 export interface FundPsbtRequest {
     /**
@@ -901,6 +968,11 @@ export interface FundPsbtRequest {
      */
     satPerVbyte: string | undefined;
     /**
+     * The fee rate, expressed in sat/kWU, that should be used to spend the
+     * input with.
+     */
+    satPerKw: string | undefined;
+    /**
      * The name of the account to fund the PSBT with. If empty, the default wallet
      * account is used.
      */
@@ -921,6 +993,20 @@ export interface FundPsbtRequest {
     changeType: ChangeAddressType;
     /** The strategy to use for selecting coins during funding the PSBT. */
     coinSelectionStrategy: CoinSelectionStrategy;
+    /** The max fee to total output amount ratio that this psbt should adhere to. */
+    maxFeeRatio: number;
+    /**
+     * The custom lock ID to use for the inputs in the funded PSBT. The value
+     * if set must be exactly 32 bytes long. If empty, the default lock ID will
+     * be used.
+     */
+    customLockId: Uint8Array | string;
+    /**
+     * If set, then the inputs in the funded PSBT will be locked for the
+     * specified duration. The lock duration is specified in seconds. If not
+     * set, the default lock duration will be used.
+     */
+    lockExpirationSeconds: string;
 }
 
 export interface FundPsbtResponse {
@@ -1258,6 +1344,7 @@ export interface WalletKit {
         request?: DeepPartial<SendOutputsRequest>
     ): Promise<SendOutputsResponse>;
     /**
+     * lncli: `wallet estimatefeerate`
      * EstimateFee attempts to query the internal fee estimator of the wallet to
      * determine the fee (in sat/kw) to attach to a transaction in order to
      * achieve the confirmation target.
@@ -1266,7 +1353,7 @@ export interface WalletKit {
         request?: DeepPartial<EstimateFeeRequest>
     ): Promise<EstimateFeeResponse>;
     /**
-     * lncli: `pendingsweeps`
+     * lncli: `wallet pendingsweeps`
      * PendingSweeps returns lists of on-chain outputs that lnd is currently
      * attempting to sweep within its central batching engine. Outputs with similar
      * fee rates are batched together in order to sweep them within a single
@@ -1311,6 +1398,14 @@ export interface WalletKit {
      * the control of the wallet.
      */
     bumpFee(request?: DeepPartial<BumpFeeRequest>): Promise<BumpFeeResponse>;
+    /**
+     * lncli: `wallet bumpforceclosefee`
+     * BumpForceCloseFee is an endpoint that allows users to bump the fee of a
+     * channel force close. This only works for channels with option_anchors.
+     */
+    bumpForceCloseFee(
+        request?: DeepPartial<BumpForceCloseFeeRequest>
+    ): Promise<BumpForceCloseFeeResponse>;
     /**
      * lncli: `wallet listsweeps`
      * ListSweeps returns a list of the sweep transactions our node has produced.

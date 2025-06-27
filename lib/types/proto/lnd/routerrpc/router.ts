@@ -113,10 +113,11 @@ export interface SendPaymentRequest {
      */
     paymentRequest: string;
     /**
-     * An upper limit on the amount of time we should spend when attempting to
-     * fulfill the payment. This is expressed in seconds. If we cannot make a
-     * successful payment within this time frame, an error will be returned.
-     * This field must be non-zero.
+     * An optional limit, expressed in seconds, on the time to wait before
+     * attempting the first HTLC. Once HTLCs are in flight, the payment will
+     * not be aborted until the HTLCs are either settled or failed. If the field
+     * is not set or is explicitly set to zero, the default value of 60 seconds
+     * will be applied.
      */
     timeoutSeconds: number;
     /**
@@ -809,6 +810,10 @@ export interface ForwardHtlcInterceptResponse {
      * Any custom records that should be set on the p2p wire message message of
      * the resumed HTLC. This field is ignored if the action is not
      * RESUME_MODIFIED.
+     *
+     * This map will merge with the existing set of custom records (if any),
+     * replacing any conflicting types. Note that there currently is no support
+     * for deleting existing custom records (they can only be replaced).
      */
     outWireCustomRecords: { [key: string]: Uint8Array | string };
 }
