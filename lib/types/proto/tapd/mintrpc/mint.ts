@@ -7,6 +7,7 @@ import type {
     ScriptKey,
     GroupKeyRequest,
     GroupVirtualTx,
+    ExternalKey,
     TapscriptFullTree,
     TapBranch,
     GroupWitness
@@ -79,6 +80,8 @@ export interface UnsealedAsset {
     groupKeyRequest: GroupKeyRequest | undefined;
     /** The group virtual transaction for the asset. */
     groupVirtualTx: GroupVirtualTx | undefined;
+    /** The byte serialized PSBT equivalent of the group virtual transaction. */
+    groupVirtualPsbt: string;
 }
 
 export interface MintAsset {
@@ -118,12 +121,21 @@ export interface MintAsset {
     /**
      * The optional key that will be used as the internal key for an asset group
      * created with this asset.
+     *
+     * If this field is set then external_group_key must be unset, and vice versa.
      */
     groupInternalKey: KeyDescriptor | undefined;
     /**
-     * The optional root of a tapscript tree that will be used when constructing a
-     * new asset group key. This enables future issuance authorized with a script
-     * witness.
+     * An optional root of a Tapscript tree used when constructing a new asset
+     * group key. This allows for future asset issuance authorized using a
+     * script witness.
+     *
+     * If an external group key is provided, the V1 scheme for group key script
+     * construction will be used, which supports PSBT signing. In this scheme,
+     * the user-supplied Tapscript root is extended by two levels of Tapscript
+     * siblings that commit to the group anchor's asset ID. As a result, the
+     * provided Tapscript root becomes a branch within a larger Tapscript tree,
+     * and the final Tapscript root will differ from the one specified here.
      */
     groupTapscriptRoot: Uint8Array | string;
     /**
@@ -144,6 +156,29 @@ export interface MintAsset {
      * compatible with assets that have a JSON MetaData field.
      */
     decimalDisplay: number;
+    /**
+     * The external group key is an optional field that allows specifying an
+     * external signing key for the group virtual transaction during minting.
+     * This key enables signing operations to be performed externally, outside
+     * the daemon.
+     *
+     * If this field is set then group_internal_key must be unset, and vice versa.
+     */
+    externalGroupKey: ExternalKey | undefined;
+    /**
+     * Enabling this flag allows the creation of universe commitments for a new
+     * asset group.
+     *
+     * Universe commitments are minter-controlled, on-chain attestations that
+     * anchor and verify the state of an asset group.
+     *
+     * This flag imposes restrictions on the minting process by limiting the batch
+     * to assets within the same universe, meaning they share the same group key.
+     * This option is applicable only for the creation of a new asset group
+     * (i.e., the first minting tranche of an asset group) and ensures that the
+     * batch is limited to a single asset group.
+     */
+    universeCommitments: boolean;
 }
 
 export interface MintAssetRequest {
@@ -216,7 +251,7 @@ export interface FundBatchRequest {
 
 export interface FundBatchResponse {
     /** The funded batch. */
-    batch: MintingBatch | undefined;
+    batch: VerboseBatch | undefined;
 }
 
 export interface SealBatchRequest {
@@ -226,8 +261,18 @@ export interface SealBatchRequest {
      * possibly printed on the command line in the case of a very large batch.
      */
     shortResponse: boolean;
-    /** The assetID, witness pairs that authorize asset membership in a group. */
+    /**
+     * The assetID, witness pairs that authorize asset membership in a group.
+     * This field should not be used in conjunction with
+     * `signed_group_virtual_psbts`; use one or the other.
+     */
     groupWitnesses: GroupWitness[];
+    /**
+     * The base64 encoded signed group virtual PSBTs.
+     * This field should not be used in conjunction with `group_witnesses`;
+     * use one or the other.
+     */
+    signedGroupVirtualPsbts: string[];
 }
 
 export interface SealBatchResponse {
@@ -277,8 +322,8 @@ export interface ListBatchRequest {
      */
     batchKeyStr: string | undefined;
     /**
-     * If true, pending asset group information will be shown for the pending
-     * batch.
+     * If true, pending asset group details will be included for any funded,
+     * non-empty pending batch. Unfunded or empty batches will be excluded.
      */
     verbose: boolean;
 }

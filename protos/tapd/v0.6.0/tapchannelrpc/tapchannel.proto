@@ -10,7 +10,7 @@ import "routerrpc/router.proto";
 import "taprootassets.proto";
 
 service TaprootAssetChannels {
-    /*
+    /* litcli: `ln fundchannel`
     FundChannel initiates the channel funding negotiation with a peer for the
     creation of a channel that contains a specified amount of a given asset.
     */
@@ -26,7 +26,7 @@ service TaprootAssetChannels {
     rpc EncodeCustomRecords (EncodeCustomRecordsRequest)
         returns (EncodeCustomRecordsResponse);
 
-    /*
+    /* litcli: `ln sendpayment`
     SendPayment is a wrapper around lnd's routerrpc.SendPaymentV2 RPC method
     with asset specific parameters. It allows RPC users to send asset keysend
     payments (direct payments) or payments to an invoice with a specified asset
@@ -34,17 +34,19 @@ service TaprootAssetChannels {
     */
     rpc SendPayment (SendPaymentRequest) returns (stream SendPaymentResponse);
 
-    /*
+    /* litcli: `ln addinvoice`
     AddInvoice is a wrapper around lnd's lnrpc.AddInvoice method with asset
     specific parameters. It allows RPC users to create invoices that correspond
-    to the specified asset amount.
+    to the specified asset amount. If a peer pubkey is specified, then only that
+    peer will be used for RFQ negotiations. If none is specified then RFQ quotes
+    for all peers with suitable asset channels will be created.
     */
     rpc AddInvoice (AddInvoiceRequest) returns (AddInvoiceResponse);
 
-    /*
+    /* litcli: `ln decodeassetinvoice`
     DecodeAssetPayReq is similar to lnd's lnrpc.DecodePayReq, but it accepts an
-    asset ID and returns the invoice amount expressed in asset units along side
-    the normal information.
+    asset ID or group key and returns the invoice amount expressed in asset
+    units along side the normal information.
     */
     rpc DecodeAssetPayReq (AssetPayReq) returns (AssetPayReqResponse);
 }
@@ -70,6 +72,11 @@ message FundChannelRequest {
     // is equivalent to a donation to the remote party, unless they reimburse
     // the funds in another way (outside the protocol).
     int64 push_sat = 5;
+
+    // The group key to use for the channel. This can be used instead of the
+    // asset_id to allow assets from a fungible group to be used for the channel
+    // funding instead of just assets from a single minting tranche (asset_id).
+    bytes group_key = 6;
 }
 
 message FundChannelResponse {
@@ -106,7 +113,7 @@ message SendPaymentRequest {
     // The asset ID to use for the payment. This must be set for both invoice
     // and keysend payments, unless RFQ negotiation was already done beforehand
     // and payment_request.first_hop_custom_records already contains valid RFQ
-    // data.
+    // data. Mutually exclusive to group_key.
     bytes asset_id = 1;
 
     // The asset amount to send in a keysend payment. This amount is ignored for
@@ -142,6 +149,10 @@ message SendPaymentRequest {
     // are sent out to the network than the invoice amount plus routing fees
     // require to be paid.
     bool allow_overpay = 6;
+
+    // The group key which dictates which assets may be used for this payment.
+    // Mutually exclusive to asset_id.
+    bytes group_key = 7;
 }
 
 message SendPaymentResponse {
@@ -164,30 +175,41 @@ message HodlInvoice {
 }
 
 message AddInvoiceRequest {
-    // The asset ID to use for the invoice.
+    // The asset ID to use for the invoice. Mutually exclusive to group_key.
     bytes asset_id = 1;
 
     // The asset amount to receive.
     uint64 asset_amount = 2;
 
     // The node identity public key of the peer to ask for a quote for receiving
-    // assets and converting them from satoshis. This must be specified if
-    // there are multiple channels with the given asset ID.
+    // assets and converting them from satoshis. When specified only quotes with
+    // this peer will be negotiated.
     bytes peer_pubkey = 3;
 
-    // The full lnd invoice request to send. All fields (except for the value
-    // and the route hints) behave the same way as they do for lnd's
-    // lnrpc.AddInvoice RPC method (see the API docs at
+    // The full lnd invoice request to send. All fields behave the same way as
+    // they do for lnd's lnrpc.AddInvoice RPC method (see the API docs at
     // https://lightning.engineering/api-docs/api/lnd/lightning/add-invoice
-    // for more details). The value/value_msat fields will be overwritten by the
-    // satoshi (or milli-satoshi) equivalent of the asset amount, after
-    // negotiating a quote with a peer that supports the given asset ID.
+    // for more details).
+    //
+    // Only one of the asset_amount/value/value_msat may be set to dictate the
+    // value of the invoice. When using asset_amount, the value/value_msat
+    // fields will be overwritten by the satoshi (or milli-satoshi) equivalent
+    // of the asset amount, after negotiating a quote with a peer that supports
+    // the given asset ID.
+    //
+    // If the value/value_msat are used, we still receive assets, but they will
+    // exactly evaluate to the defined amount in sats/msats.
     lnrpc.Invoice invoice_request = 4;
 
     // If set, then this will make the invoice created a hodl invoice, which
     // won't be settled automatically. Instead, users will need to use the
     // invoicesrpc.SettleInvoice call to manually settle the invoice.
     HodlInvoice hodl_invoice = 5;
+
+    // The group key which dictates which assets may be accepted for this
+    // invoice. If set, any asset that belongs to this group may be accepted to
+    // settle this invoice. Mutually exclusive to asset_id.
+    bytes group_key = 6;
 }
 
 message AddInvoiceResponse {
@@ -200,11 +222,16 @@ message AddInvoiceResponse {
 
 message AssetPayReq {
     // The asset ID that will be used to resolve the invoice's satoshi amount.
+    // Mutually exclusive to group_key.
     bytes asset_id = 1;
 
     // The normal LN invoice that whose amount will be mapped to units of the
     // asset ID.
     string pay_req_string = 2;
+
+    // The group key that will be used to resolve the invoice's satoshi amount.
+    // Mutually exclusive to asset_id.
+    bytes group_key = 3;
 }
 
 message AssetPayReqResponse {
@@ -218,7 +245,9 @@ message AssetPayReqResponse {
     taprpc.AssetGroup asset_group = 3;
 
     // Genesis information for the asset ID which includes the meta hash, and
-    // asset ID.
+    // asset ID. This is only set if the payment request was decoded with an
+    // asset ID and not with a group key (since a group can contain assets from
+    // different minting events or genesis infos).
     taprpc.GenesisInfo genesis_info = 4;
 
     // The normal decoded payment request.

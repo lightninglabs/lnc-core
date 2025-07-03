@@ -1,5 +1,11 @@
 /* eslint-disable */
-import type { AssetType, Asset } from '../taprootassets';
+import type {
+    AssetType,
+    Asset,
+    AssetMeta,
+    GenesisReveal,
+    GroupKeyReveal
+} from '../taprootassets';
 
 export enum ProofType {
     PROOF_TYPE_UNSPECIFIED = 'PROOF_TYPE_UNSPECIFIED',
@@ -237,6 +243,26 @@ export interface AssetProofResponse {
      * multiverse.
      */
     multiverseInclusionProof: Uint8Array | string;
+    /**
+     * The issuance related data for an issuance asset leaf. This is empty for
+     * any other type of asset leaf.
+     */
+    issuanceData: IssuanceData | undefined;
+}
+
+export interface IssuanceData {
+    /** The reveal meta data associated with the proof, if available. */
+    metaReveal: AssetMeta | undefined;
+    /**
+     * GenesisReveal is an optional field that is the Genesis information for
+     * the asset. This is required for minting proofs.
+     */
+    genesisReveal: GenesisReveal | undefined;
+    /**
+     * GroupKeyReveal is an optional field that includes the information needed
+     * to derive the tweaked group key.
+     */
+    groupKeyReveal: GroupKeyReveal | undefined;
 }
 
 export interface AssetProof {
@@ -386,6 +412,7 @@ export interface AssetStatsAsset {
     genesisHeight: number;
     genesisTimestamp: string;
     anchorPoint: string;
+    decimalDisplay: number;
 }
 
 export interface UniverseAssetStats {
