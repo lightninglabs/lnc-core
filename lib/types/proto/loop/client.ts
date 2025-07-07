@@ -384,6 +384,17 @@ export interface LoopOutRequest {
      * as the timeout for the payment.
      */
     paymentTimeout: number;
+    /**
+     * The optional asset information to use for the swap. If set, the swap will
+     * be paid in the specified asset using the provided edge node. An Asset client
+     * must be connected to the loop client to use this feature.
+     */
+    assetInfo: AssetLoopOutRequest | undefined;
+    /**
+     * The optional RFQ information to use for the swap. If set, the swap will
+     * use the provided RFQs to pay for the swap invoice.
+     */
+    assetRfqInfo: AssetRfqInfo | undefined;
 }
 
 export interface LoopInRequest {
@@ -537,11 +548,15 @@ export interface SwapStatus {
     outgoingChanSet: string[];
     /** An optional label given to the swap on creation. */
     label: string;
+    /** If the swap was an asset swap, the asset information will be returned. */
+    assetInfo: AssetLoopOutInfo | undefined;
 }
 
 export interface ListSwapsRequest {
     /** Optional filter to only return swaps that match the filter. */
     listSwapFilter: ListSwapsFilter | undefined;
+    /** Set a maximum number of swaps to return in the response. */
+    maxSwaps: string;
 }
 
 export interface ListSwapsFilter {
@@ -555,6 +570,10 @@ export interface ListSwapsFilter {
     label: string;
     /** If specified on creation, the last hop of the swap. */
     loopInLastHop: Uint8Array | string;
+    /** If specified, only returns asset swaps. */
+    assetSwapOnly: boolean;
+    /** If specified, returns swaps initiated after this Unix (ns) timestamp. */
+    startTimestampNs: string;
 }
 
 export enum ListSwapsFilter_SwapTypeFilter {
@@ -570,6 +589,8 @@ export enum ListSwapsFilter_SwapTypeFilter {
 export interface ListSwapsResponse {
     /** The list of all currently known swaps and their status. */
     swaps: SwapStatus[];
+    /** Timestamp to use for paging start_timestamp_ns. */
+    nextStartTime: string;
 }
 
 export interface SwapInfoRequest {
@@ -643,6 +664,11 @@ export interface QuoteRequest {
      * the same time.
      */
     depositOutpoints: string[];
+    /**
+     * The optional asset information to use for the swap. If set, the quote will
+     * be returned in the specified asset.
+     */
+    assetInfo: AssetLoopOutRequest | undefined;
 }
 
 export interface InQuoteResponse {
@@ -682,6 +708,11 @@ export interface OutQuoteResponse {
     cltvDelta: number;
     /** The confirmation target to be used for the sweep of the on-chain HTLC. */
     confTarget: number;
+    /**
+     * If the request was for an asset swap, the quote will return the rfq ids
+     * that will be used to pay for the swap and prepay invoices.
+     */
+    assetRfqInfo: AssetRfqInfo | undefined;
 }
 
 export interface ProbeRequest {
@@ -766,6 +797,12 @@ export interface GetInfoResponse {
     loopOutStats: LoopStats | undefined;
     /** Statistics about loop ins. */
     loopInStats: LoopStats | undefined;
+    /**
+     * The Git commit hash the Loop binary build was based on. If the build had
+     * uncommited changes, this field will contain the most recent commit hash,
+     * suffixed by "-dirty".
+     */
+    commitHash: string;
 }
 
 export interface GetLiquidityParamsRequest {}
@@ -898,6 +935,39 @@ export interface LiquidityParameters {
     account: string;
     /** The address type of the account specified in the account field. */
     accountAddrType: AddressType;
+    /**
+     * A map of asset parameters to use for swaps. The key is the asset id and the
+     * value is the parameters to use for swaps in that asset.
+     */
+    easyAssetParams: { [key: string]: EasyAssetAutoloopParams };
+    /**
+     * Set to true to enable fast swap publication. If set, the server will
+     * publish the HTLC immediately after receiving the swap request. This
+     * setting has direct implications on the swap fees, as fast swaps may
+     * not be able to be batched with other swaps.
+     */
+    fastSwapPublication: boolean;
+}
+
+export interface LiquidityParameters_EasyAssetParamsEntry {
+    key: string;
+    value: EasyAssetAutoloopParams | undefined;
+}
+
+export interface EasyAssetAutoloopParams {
+    /**
+     * Set to true to enable easy autoloop for this asset. If set the client will
+     * automatically dispatch swaps in order to meet the configured local balance
+     * target size. Currently only loop out is supported, meaning that easy
+     * autoloop can only reduce the funds that are held as balance in channels.
+     */
+    enabled: boolean;
+    /**
+     * The local balance target size, expressed in the asset's base units. This is
+     * used by easy autoloop to determine how much liquidity should be maintained
+     * in channels.
+     */
+    localTargetAssetAmt: string;
 }
 
 export interface LiquidityRule {
@@ -1033,8 +1103,15 @@ export interface InstantOutResponse {
 export interface InstantOutQuoteRequest {
     /** The amount to swap in satoshis. */
     amt: string;
-    /** The amount of reservations to use for the swap. */
+    /**
+     * Deprecated: use 'reservation_ids' instead.
+     * The amount of reservations to use for the swap.
+     *
+     * @deprecated
+     */
     numReservations: number;
+    /** The reservations to use for the swap. */
+    reservationIds: Uint8Array | string[];
 }
 
 export interface InstantOutQuoteResponse {
@@ -1114,13 +1191,21 @@ export interface WithdrawDepositsRequest {
     destAddr: string;
     /** The fee rate in sat/vbyte to use for the withdrawal transaction. */
     satPerVbyte: string;
+    /**
+     * The amount in satoshis that should be withdrawn from the selected deposits.
+     * If there is change, it will be sent back to the static address. The fees for
+     * the transaction are taken from the change output. If the change is below
+     * the dust limit, there won't be a change output and the dust goes towards
+     * fees.
+     */
+    amount: string;
 }
 
 export interface WithdrawDepositsResponse {
     /** The transaction hash of the withdrawal transaction. */
     withdrawalTxHash: string;
-    /** The pkscript of the withdrawal transaction. */
-    pkScript: string;
+    /** The destination address of the withdrawal transaction. */
+    address: string;
 }
 
 export interface OutPoint {
@@ -1142,6 +1227,13 @@ export interface ListStaticAddressDepositsRequest {
 export interface ListStaticAddressDepositsResponse {
     /** A list of all deposits that match the filtered state. */
     filteredDeposits: Deposit[];
+}
+
+export interface ListStaticAddressWithdrawalRequest {}
+
+export interface ListStaticAddressWithdrawalResponse {
+    /** A list of all static address withdrawals. */
+    withdrawals: StaticAddressWithdrawal[];
 }
 
 export interface ListStaticAddressSwapsRequest {}
@@ -1190,6 +1282,25 @@ export interface Deposit {
      * loop-in swap anymore.
      */
     blocksUntilExpiry: string;
+}
+
+export interface StaticAddressWithdrawal {
+    /** The transaction id of the withdrawal transaction. */
+    txId: string;
+    /** The selected deposits that is withdrawn from. */
+    deposits: Deposit[];
+    /** The sum of the deposit values that was selected for withdrawal. */
+    totalDepositAmountSatoshis: string;
+    /**
+     * The actual amount that was withdrawn from the selected deposits. This value
+     * represents the sum of selected deposit values minus tx fees minus optional
+     * change output.
+     */
+    withdrawnAmountSatoshis: string;
+    /** An optional change. */
+    changeAmountSatoshis: string;
+    /** The confirmation block height of the withdrawal transaction. */
+    confirmationHeight: number;
 }
 
 export interface StaticAddressLoopInSwap {
@@ -1291,6 +1402,98 @@ export interface StaticAddressLoopInResponse {
      * side and the client can retry the swap with different parameters.
      */
     paymentTimeoutSeconds: number;
+}
+
+export interface AssetLoopOutRequest {
+    /**
+     * The asset id to use to pay for the swap invoice. If set an
+     * asset client is needed to set to be able to pay the invoice.
+     */
+    assetId: Uint8Array | string;
+    /**
+     * The node identity public key of the peer to ask for a quote for sending out
+     * the assets and converting them to satoshis. This must be specified if
+     * an asset id is set.
+     */
+    assetEdgeNode: Uint8Array | string;
+    /**
+     * An optional maximum multiplier for the rfq rate. If not set, the default
+     * will be 1.1. This means if we request a loop out quote for 1 BTC, the off
+     * chain cost will be at most 1.1 BTC.
+     */
+    maxLimitMultiplier: number;
+    /** An optional expiry unix timestamp for when the rfq quote should expire. */
+    expiry: string;
+}
+
+export interface AssetRfqInfo {
+    /** The Prepay RFQ ID to use to pay for the prepay invoice. */
+    prepayRfqId: Uint8Array | string;
+    /**
+     * The maximum asset amt we'll pay for the prepay payment. This includes the
+     * max limit multiplier that was set in the request.
+     */
+    maxPrepayAssetAmt: string;
+    /** The asset to BTC conversion rate for the prepay invoice. */
+    prepayAssetRate: FixedPoint | undefined;
+    /** The Swap RFQ ID to use to pay for the swap invoice. */
+    swapRfqId: Uint8Array | string;
+    /**
+     * The maximum asset amt we'll pay for the swap payment. This includes the
+     * max limit multiplier that was set in the request.
+     */
+    maxSwapAssetAmt: string;
+    /** The asset to BTC conversion rate for the swap invoice. */
+    swapAssetRate: FixedPoint | undefined;
+    /** The name of the asset to swap. */
+    assetName: string;
+}
+
+/**
+ * FixedPoint is a scaled integer representation of a fractional number.
+ *
+ * This type consists of two integer fields: a coefficient and a scale.
+ * Using this format enables precise and consistent representation of fractional
+ * numbers while avoiding floating-point data types, which are prone to
+ * precision errors.
+ *
+ * The relationship between the fractional representation and its fixed-point
+ * representation is expressed as:
+ * ```
+ * V = F_c / (10^F_s)
+ * ```
+ * where:
+ *
+ * * `V` is the fractional value.
+ *
+ * * `F_c` is the coefficient component of the fixed-point representation. It is
+ *    the scaled-up fractional value represented as an integer.
+ *
+ * * `F_s` is the scale component. It is an integer specifying how
+ *   many decimal places `F_c` should be divided by to obtain the fractional
+ *   representation.
+ */
+export interface FixedPoint {
+    /**
+     * The coefficient is the fractional value scaled-up as an integer. This
+     * integer is represented as a string as it may be too large to fit in a
+     * uint64.
+     */
+    coefficient: string;
+    /**
+     * The scale is the component that determines how many decimal places
+     * the coefficient should be divided by to obtain the fractional value.
+     */
+    scale: number;
+}
+
+export interface AssetLoopOutInfo {
+    /** The asset id that was used to pay for the swap invoice. */
+    assetId: string;
+    /** The human readable name of the asset. */
+    assetName: string;
+    /** The total asset offchain cost of the swap. */
+    assetCostOffchain: string;
 }
 
 /**
@@ -1495,6 +1698,13 @@ export interface SwapClient {
     listStaticAddressDeposits(
         request?: DeepPartial<ListStaticAddressDepositsRequest>
     ): Promise<ListStaticAddressDepositsResponse>;
+    /**
+     * loop:`listwithdrawals`
+     * ListStaticAddressWithdrawals returns a list of static address withdrawals.
+     */
+    listStaticAddressWithdrawals(
+        request?: DeepPartial<ListStaticAddressWithdrawalRequest>
+    ): Promise<ListStaticAddressWithdrawalResponse>;
     /**
      * loop:`listswaps`
      * ListStaticAddressSwaps returns a list of filtered static address
