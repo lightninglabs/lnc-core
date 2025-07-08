@@ -86,9 +86,13 @@ export interface ReceiveAssetEvent {
 export interface TapDev {
     /**
      * tapcli: `dev importproof`
-     * ImportProof attempts to import a proof file into the daemon. If successful,
+     * Deprecated, use the new taprpc.RegisterTransfer RPC instead! ImportProof
+     * attempts to import a proof file into the daemon. If successful,
      * a new asset will be inserted on disk, spendable using the specified target
      * script key, and internal key.
+     * NOTE: This RPC will be removed with the next major release.
+     *
+     * @deprecated
      */
     importProof(
         request?: DeepPartial<ImportProofRequest>

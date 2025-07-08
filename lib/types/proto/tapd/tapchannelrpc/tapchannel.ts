@@ -35,6 +35,12 @@ export interface FundChannelRequest {
      * the funds in another way (outside the protocol).
      */
     pushSat: string;
+    /**
+     * The group key to use for the channel. This can be used instead of the
+     * asset_id to allow assets from a fungible group to be used for the channel
+     * funding instead of just assets from a single minting tranche (asset_id).
+     */
+    groupKey: Uint8Array | string;
 }
 
 export interface FundChannelResponse {
@@ -82,7 +88,7 @@ export interface SendPaymentRequest {
      * The asset ID to use for the payment. This must be set for both invoice
      * and keysend payments, unless RFQ negotiation was already done beforehand
      * and payment_request.first_hop_custom_records already contains valid RFQ
-     * data.
+     * data. Mutually exclusive to group_key.
      */
     assetId: Uint8Array | string;
     /**
@@ -124,6 +130,11 @@ export interface SendPaymentRequest {
      * require to be paid.
      */
     allowOverpay: boolean;
+    /**
+     * The group key which dictates which assets may be used for this payment.
+     * Mutually exclusive to asset_id.
+     */
+    groupKey: Uint8Array | string;
 }
 
 export interface SendPaymentResponse {
@@ -147,24 +158,30 @@ export interface HodlInvoice {
 }
 
 export interface AddInvoiceRequest {
-    /** The asset ID to use for the invoice. */
+    /** The asset ID to use for the invoice. Mutually exclusive to group_key. */
     assetId: Uint8Array | string;
     /** The asset amount to receive. */
     assetAmount: string;
     /**
      * The node identity public key of the peer to ask for a quote for receiving
-     * assets and converting them from satoshis. This must be specified if
-     * there are multiple channels with the given asset ID.
+     * assets and converting them from satoshis. When specified only quotes with
+     * this peer will be negotiated.
      */
     peerPubkey: Uint8Array | string;
     /**
-     * The full lnd invoice request to send. All fields (except for the value
-     * and the route hints) behave the same way as they do for lnd's
-     * lnrpc.AddInvoice RPC method (see the API docs at
+     * The full lnd invoice request to send. All fields behave the same way as
+     * they do for lnd's lnrpc.AddInvoice RPC method (see the API docs at
      * https://lightning.engineering/api-docs/api/lnd/lightning/add-invoice
-     * for more details). The value/value_msat fields will be overwritten by the
-     * satoshi (or milli-satoshi) equivalent of the asset amount, after
-     * negotiating a quote with a peer that supports the given asset ID.
+     * for more details).
+     *
+     * Only one of the asset_amount/value/value_msat may be set to dictate the
+     * value of the invoice. When using asset_amount, the value/value_msat
+     * fields will be overwritten by the satoshi (or milli-satoshi) equivalent
+     * of the asset amount, after negotiating a quote with a peer that supports
+     * the given asset ID.
+     *
+     * If the value/value_msat are used, we still receive assets, but they will
+     * exactly evaluate to the defined amount in sats/msats.
      */
     invoiceRequest: Invoice | undefined;
     /**
@@ -173,6 +190,12 @@ export interface AddInvoiceRequest {
      * invoicesrpc.SettleInvoice call to manually settle the invoice.
      */
     hodlInvoice: HodlInvoice | undefined;
+    /**
+     * The group key which dictates which assets may be accepted for this
+     * invoice. If set, any asset that belongs to this group may be accepted to
+     * settle this invoice. Mutually exclusive to asset_id.
+     */
+    groupKey: Uint8Array | string;
 }
 
 export interface AddInvoiceResponse {
@@ -183,13 +206,21 @@ export interface AddInvoiceResponse {
 }
 
 export interface AssetPayReq {
-    /** The asset ID that will be used to resolve the invoice's satoshi amount. */
+    /**
+     * The asset ID that will be used to resolve the invoice's satoshi amount.
+     * Mutually exclusive to group_key.
+     */
     assetId: Uint8Array | string;
     /**
      * The normal LN invoice that whose amount will be mapped to units of the
      * asset ID.
      */
     payReqString: string;
+    /**
+     * The group key that will be used to resolve the invoice's satoshi amount.
+     * Mutually exclusive to asset_id.
+     */
+    groupKey: Uint8Array | string;
 }
 
 export interface AssetPayReqResponse {
@@ -201,7 +232,9 @@ export interface AssetPayReqResponse {
     assetGroup: AssetGroup | undefined;
     /**
      * Genesis information for the asset ID which includes the meta hash, and
-     * asset ID.
+     * asset ID. This is only set if the payment request was decoded with an
+     * asset ID and not with a group key (since a group can contain assets from
+     * different minting events or genesis infos).
      */
     genesisInfo: GenesisInfo | undefined;
     /** The normal decoded payment request. */
@@ -210,6 +243,7 @@ export interface AssetPayReqResponse {
 
 export interface TaprootAssetChannels {
     /**
+     * litcli: `ln fundchannel`
      * FundChannel initiates the channel funding negotiation with a peer for the
      * creation of a channel that contains a specified amount of a given asset.
      */
@@ -227,6 +261,7 @@ export interface TaprootAssetChannels {
         request?: DeepPartial<EncodeCustomRecordsRequest>
     ): Promise<EncodeCustomRecordsResponse>;
     /**
+     * litcli: `ln sendpayment`
      * SendPayment is a wrapper around lnd's routerrpc.SendPaymentV2 RPC method
      * with asset specific parameters. It allows RPC users to send asset keysend
      * payments (direct payments) or payments to an invoice with a specified asset
@@ -238,17 +273,21 @@ export interface TaprootAssetChannels {
         onError?: (err: Error) => void
     ): void;
     /**
+     * litcli: `ln addinvoice`
      * AddInvoice is a wrapper around lnd's lnrpc.AddInvoice method with asset
      * specific parameters. It allows RPC users to create invoices that correspond
-     * to the specified asset amount.
+     * to the specified asset amount. If a peer pubkey is specified, then only that
+     * peer will be used for RFQ negotiations. If none is specified then RFQ quotes
+     * for all peers with suitable asset channels will be created.
      */
     addInvoice(
         request?: DeepPartial<AddInvoiceRequest>
     ): Promise<AddInvoiceResponse>;
     /**
+     * litcli: `ln decodeassetinvoice`
      * DecodeAssetPayReq is similar to lnd's lnrpc.DecodePayReq, but it accepts an
-     * asset ID and returns the invoice amount expressed in asset units along side
-     * the normal information.
+     * asset ID or group key and returns the invoice amount expressed in asset
+     * units along side the normal information.
      */
     decodeAssetPayReq(
         request?: DeepPartial<AssetPayReq>

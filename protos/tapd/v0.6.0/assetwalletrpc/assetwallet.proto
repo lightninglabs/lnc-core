@@ -305,6 +305,26 @@ message CommitVirtualPsbtsRequest {
         */
         uint64 sat_per_vbyte = 7;
     }
+
+    /*
+    The custom lock ID used to identify the lock lease for UTXOs that serve as
+    inputs in the BTC-level anchor transaction. If left empty, LND's default
+    lock ID will be used.
+    */
+    bytes custom_lock_id = 8;
+
+    /*
+    If set, the UTXOs used as inputs in the BTC-level anchor transaction will be
+    locked for the specified number of seconds. If unset, LND's default lock
+    expiration of 10 minutes will be applied.
+    */
+    uint64 lock_expiration_seconds = 9;
+
+    /*
+    If set, the psbt funding step will be skipped. This is useful if the intent
+    is to create a zero-fee transaction.
+    */
+    bool skip_funding = 10;
 }
 
 message CommitVirtualPsbtsResponse {
@@ -379,6 +399,20 @@ message PublishAndLogRequest {
     inputs that were already present in the PSBT are not locked.
     */
     repeated taprpc.OutPoint lnd_locked_utxos = 5;
+
+    /*
+    If set, the anchor transaction will not be broadcast to the network. This
+    is useful when an external system handles broadcasting, such as in custom
+    transaction packaging workflows.
+    */
+    bool skip_anchor_tx_broadcast = 6;
+
+    /*
+    An optional short label for the transfer. This label can be used to track
+    the progress of the transfer via the logs or an event subscription.
+    Multiple transfers can share the same label.
+    */
+    string label = 7;
 }
 
 message NextInternalKeyRequest {

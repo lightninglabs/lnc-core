@@ -94,6 +94,49 @@ export enum AddrVersion {
     UNRECOGNIZED = 'UNRECOGNIZED'
 }
 
+export enum ScriptKeyType {
+    /**
+     * SCRIPT_KEY_UNKNOWN - The type of script key is not known. This should only be stored for assets
+     * where we don't know the internal key of the script key (e.g. for
+     * imported proofs).
+     */
+    SCRIPT_KEY_UNKNOWN = 'SCRIPT_KEY_UNKNOWN',
+    /**
+     * SCRIPT_KEY_BIP86 - The script key is a normal BIP-86 key. This means that the internal key is
+     * turned into a Taproot output key by applying a BIP-86 tweak to it.
+     */
+    SCRIPT_KEY_BIP86 = 'SCRIPT_KEY_BIP86',
+    /**
+     * SCRIPT_KEY_SCRIPT_PATH_EXTERNAL - The script key is a key that contains a script path that is defined by the
+     * user and is therefore external to the tapd wallet. Spending this key
+     * requires providing a specific witness and must be signed through the vPSBT
+     * signing flow.
+     */
+    SCRIPT_KEY_SCRIPT_PATH_EXTERNAL = 'SCRIPT_KEY_SCRIPT_PATH_EXTERNAL',
+    /**
+     * SCRIPT_KEY_BURN - The script key is a specific un-spendable key that indicates a burnt asset.
+     * Assets with this key type can never be spent again, as a burn key is a
+     * tweaked NUMS key that nobody knows the private key for.
+     */
+    SCRIPT_KEY_BURN = 'SCRIPT_KEY_BURN',
+    /**
+     * SCRIPT_KEY_TOMBSTONE - The script key is a specific un-spendable key that indicates a tombstone
+     * output. This is only the case for zero-value assets that result from a
+     * non-interactive (TAP address) send where no change was left over.
+     */
+    SCRIPT_KEY_TOMBSTONE = 'SCRIPT_KEY_TOMBSTONE',
+    /**
+     * SCRIPT_KEY_CHANNEL - The script key is used for an asset that resides within a Taproot Asset
+     * Channel. That means the script key is either a funding key (OP_TRUE), a
+     * commitment output key (to_local, to_remote, htlc), or a HTLC second-level
+     * transaction output key. Keys related to channels are not shown in asset
+     * balances (unless specifically requested) and are never used for coin
+     * selection.
+     */
+    SCRIPT_KEY_CHANNEL = 'SCRIPT_KEY_CHANNEL',
+    UNRECOGNIZED = 'UNRECOGNIZED'
+}
+
 export enum AddrEventStatus {
     ADDR_EVENT_STATUS_UNKNOWN = 'ADDR_EVENT_STATUS_UNKNOWN',
     ADDR_EVENT_STATUS_TRANSACTION_DETECTED = 'ADDR_EVENT_STATUS_TRANSACTION_DETECTED',
@@ -197,6 +240,25 @@ export interface ListAssetRequest {
      * inbound assets).
      */
     includeUnconfirmedMints: boolean;
+    /** Only return assets with amount greater or equal to this value. */
+    minAmount: string;
+    /** Only return assets with amount less or equal to this value. */
+    maxAmount: string;
+    /** Only return assets that belong to the group with this key. */
+    groupKey: Uint8Array | string;
+    /** Return all assets that use this script key. */
+    scriptKey: ScriptKey | undefined;
+    /** Return all assets that are currently anchored on this outpoint. */
+    anchorOutpoint: OutPoint | undefined;
+    /**
+     * The script key type to filter the assets by. If not set, only assets with
+     * a BIP-0086 script key will be returned (which is the equivalent of
+     * setting script_key_type.explicit_type = SCRIPT_KEY_BIP86). If the type
+     * is set to SCRIPT_KEY_BURN or SCRIPT_KEY_TOMBSTONE the include_spent flag
+     * will automatically be set to true, because assets of that type are always
+     * marked as spent.
+     */
+    scriptKeyType: ScriptKeyTypeQuery | undefined;
 }
 
 export interface AnchorInfo {
@@ -225,6 +287,8 @@ export interface AnchorInfo {
     tapscriptSibling: Uint8Array | string;
     /** The height of the block which contains the anchor transaction. */
     blockHeight: number;
+    /** The UTC Unix timestamp of the block containing the anchor transaction. */
+    blockTimestamp: string;
 }
 
 export interface GenesisInfo {
@@ -245,8 +309,38 @@ export interface GenesisInfo {
     outputIndex: number;
 }
 
+/**
+ * This message represents an external key used for deriving and managing
+ * hierarchical deterministic (HD) wallet addresses according to BIP-86.
+ */
+export interface ExternalKey {
+    /**
+     * This field specifies the extended public key derived at depth 3 of the
+     * BIP-86 hierarchy (e.g., m/86'/0'/0'). This key serves as the parent key for
+     * deriving child public keys and addresses.
+     */
+    xpub: string;
+    /**
+     * This field specifies the fingerprint of the master key, derived from the
+     * first 4 bytes of the hash160 of the master public key. It is used to
+     * identify the master key in BIP-86 derivation schemes.
+     */
+    masterFingerprint: Uint8Array | string;
+    /**
+     * This field specifies the extended BIP-86 derivation path used to derive a
+     * child key from the XPub. Starting from the base path of the XPub
+     * (e.g., m/86'/0'/0'), this path must contain exactly 5 components in total
+     * (e.g., m/86'/0'/0'/0/0), with the additional components defining specific
+     * child keys, such as individual addresses.
+     */
+    derivationPath: string;
+}
+
 export interface GroupKeyRequest {
-    /** The internal key for the asset group before any tweaks have been applied. */
+    /**
+     * The internal key for the asset group before any tweaks have been applied.
+     * If this field is set then external_key must be empty, and vice versa.
+     */
     rawKey: KeyDescriptor | undefined;
     /**
      * The genesis of the group anchor asset, which is used to derive the single
@@ -266,6 +360,15 @@ export interface GroupKeyRequest {
      * member of this asset group.
      */
     newAsset: Uint8Array | string;
+    /**
+     * The external key is an optional field that allows specifying an
+     * external signing key for the group virtual transaction during minting.
+     * This key enables signing operations to be performed externally, outside
+     * the daemon.
+     *
+     * If this field is set then raw_key must be empty, and vice versa.
+     */
+    externalKey: ExternalKey | undefined;
 }
 
 export interface TxOut {
@@ -401,6 +504,7 @@ export interface Asset {
      */
     isBurn: boolean;
     /**
+     * Deprecated, use script_key_type instead!
      * Indicates whether this script key has either been derived by the local
      * wallet or was explicitly declared to be known by using the
      * DeclareScriptKey RPC. Knowing the key conceptually means the key belongs
@@ -412,6 +516,7 @@ export interface Asset {
      */
     scriptKeyDeclaredKnown: boolean;
     /**
+     * Deprecated, use script_key_type instead!
      * Indicates whether the script key is known to have a Tapscript spend path,
      * meaning that the Taproot merkle root tweak is not empty. This will only
      * ever be true if either script_key_is_local or script_key_internals_known
@@ -426,6 +531,13 @@ export interface Asset {
      * unknown in the current context.
      */
     decimalDisplay: DecimalDisplay | undefined;
+    /**
+     * The type of the script key. This type is either user-declared when custom
+     * script keys are added, or automatically determined by the daemon for
+     * standard operations (e.g. BIP-86 keys, burn keys, tombstone keys, channel
+     * related keys).
+     */
+    scriptKeyType: ScriptKeyType;
 }
 
 export interface PrevWitness {
@@ -455,6 +567,12 @@ export interface ListAssetResponse {
 
 export interface ListUtxosRequest {
     includeLeased: boolean;
+    /**
+     * The script key type to filter the assets by. If not set, only assets with
+     * a BIP-0086 script key will be returned (which is the equivalent of
+     * setting script_key_type.explicit_type = SCRIPT_KEY_BIP86).
+     */
+    scriptKeyType: ScriptKeyTypeQuery | undefined;
 }
 
 export interface ManagedUtxo {
@@ -547,6 +665,15 @@ export interface ListBalancesRequest {
     groupKeyFilter: Uint8Array | string;
     /** An option to include previous leased assets in the balances. */
     includeLeased: boolean;
+    /**
+     * The script key type to filter the assets by. If not set, only assets with
+     * a BIP-0086 script key will be returned (which is the equivalent of
+     * setting script_key_type.explicit_type = SCRIPT_KEY_BIP86). If the type
+     * is set to SCRIPT_KEY_BURN or SCRIPT_KEY_TOMBSTONE the include_spent flag
+     * will automatically be set to true, because assets of that type are always
+     * marked as spent.
+     */
+    scriptKeyType: ScriptKeyTypeQuery | undefined;
 }
 
 export interface AssetBalance {
@@ -638,6 +765,23 @@ export interface AssetTransfer {
      * unconfirmed.
      */
     anchorTxBlockHash: ChainHash | undefined;
+    /**
+     * The block height of the blockchain block that contains the anchor
+     * transaction. If the anchor transaction is still unconfirmed, this value
+     * will be 0.
+     */
+    anchorTxBlockHeight: number;
+    /**
+     * An optional short label for the transfer. This label can be used to track
+     * the progress of the transfer via the logs or an event subscription.
+     * Multiple transfers can share the same label.
+     */
+    label: string;
+    /**
+     * The L1 transaction that anchors the Taproot Asset commitment where the
+     * asset resides.
+     */
+    anchorTx: Uint8Array | string;
 }
 
 export interface TransferInput {
@@ -666,6 +810,8 @@ export interface TransferOutputAnchor {
     merkleRoot: Uint8Array | string;
     tapscriptSibling: Uint8Array | string;
     numPassiveAssets: number;
+    /** pk_script is the pkscript of the anchor output. */
+    pkScript: Uint8Array | string;
 }
 
 export interface TransferOutput {
@@ -685,6 +831,7 @@ export interface TransferOutput {
     relativeLockTime: string;
     /** The delivery status of the proof associated with this output. */
     proofDeliveryStatus: ProofDeliveryStatus;
+    assetId: Uint8Array | string;
 }
 
 export interface StopRequest {}
@@ -800,6 +947,13 @@ export interface NewAddrRequest {
     addressVersion: AddrVersion;
 }
 
+export interface ScriptKeyTypeQuery {
+    /** Query for assets of a specific script key type. */
+    explicitType: ScriptKeyType | undefined;
+    /** Query for assets with all script key types. */
+    allTypes: boolean | undefined;
+}
+
 export interface ScriptKey {
     /**
      * The full Taproot output key the asset is locked to. This is either a BIP-86
@@ -814,6 +968,13 @@ export interface ScriptKey {
      * empty then a BIP-86 style tweak is applied to the internal key.
      */
     tapTweak: Uint8Array | string;
+    /**
+     * The type of the script key. This type is either user-declared when custom
+     * script keys are added, or automatically determined by the daemon for
+     * standard operations (e.g. BIP-86 keys, burn keys, tombstone keys, channel
+     * related keys).
+     */
+    type: ScriptKeyType;
 }
 
 export interface KeyLocator {
@@ -969,6 +1130,23 @@ export interface ExportProofRequest {
     outpoint: OutPoint | undefined;
 }
 
+export interface UnpackProofFileRequest {
+    /**
+     * The raw proof file encoded as bytes. Must be a file and not just an
+     * individual mint/transfer proof.
+     */
+    rawProofFile: Uint8Array | string;
+}
+
+export interface UnpackProofFileResponse {
+    /**
+     * The individual proofs contained in the proof file, ordered by their
+     * appearance within the file (issuance proof first, last known transfer
+     * last).
+     */
+    rawProofs: Uint8Array | string[];
+}
+
 export interface AddrEvent {
     /** The time the event was created in unix timestamp seconds. */
     creationTimeUnixSeconds: string;
@@ -1014,6 +1192,18 @@ export interface SendAssetRequest {
     tapAddrs: string[];
     /** The optional fee rate to use for the minting transaction, in sat/kw. */
     feeRate: number;
+    /**
+     * An optional short label for the send transfer. This label can be used to
+     * track the progress of the transfer via the logs or an event subscription.
+     * Multiple transfers can share the same label.
+     */
+    label: string;
+    /**
+     * A flag to skip the proof courier ping check. This is useful for
+     * testing purposes and for forced transfers when the proof courier
+     * is not immediately available.
+     */
+    skipProofCourierPingCheck: boolean;
 }
 
 export interface PrevInputAsset {
@@ -1148,6 +1338,11 @@ export interface SubscribeSendEventsRequest {
      * all receive events for all parcels.
      */
     filterScriptKey: Uint8Array | string;
+    /**
+     * Filter send events by a specific label. Leave empty to not filter by
+     * transfer label.
+     */
+    filterLabel: string;
 }
 
 export interface SendEvent {
@@ -1187,6 +1382,10 @@ export interface SendEvent {
     transfer: AssetTransfer | undefined;
     /** An optional error, indicating that executing the send_state failed. */
     error: string;
+    /** The label of the transfer. */
+    transferLabel: string;
+    /** The next send state that will be executed. */
+    nextSendState: string;
 }
 
 export interface AnchorTransaction {
@@ -1208,6 +1407,21 @@ export interface AnchorTransaction {
     lndLockedUtxos: OutPoint[];
     /** The final, signed anchor transaction that was broadcast to the network. */
     finalTx: Uint8Array | string;
+}
+
+export interface RegisterTransferRequest {
+    /** The asset ID of the asset to register the transfer for. */
+    assetId: Uint8Array | string;
+    /** The optional group key of the asset to register the transfer for. */
+    groupKey: Uint8Array | string;
+    /** The script key of the asset to register the transfer for. */
+    scriptKey: Uint8Array | string;
+    /** The outpoint of the transaction that was used to receive the asset. */
+    outpoint: OutPoint | undefined;
+}
+
+export interface RegisterTransferResponse {
+    registeredAsset: Asset | undefined;
 }
 
 export interface TaprootAssets {
@@ -1312,6 +1526,14 @@ export interface TaprootAssets {
      */
     exportProof(request?: DeepPartial<ExportProofRequest>): Promise<ProofFile>;
     /**
+     * tapcli: `proofs unpack`
+     * UnpackProofFile unpacks a proof file into a list of the individual raw
+     * proofs in the proof chain.
+     */
+    unpackProofFile(
+        request?: DeepPartial<UnpackProofFileRequest>
+    ): Promise<UnpackProofFileResponse>;
+    /**
      * tapcli: `assets send`
      * SendAsset uses one or multiple passed Taproot Asset address(es) to attempt
      * to complete an asset send. The method returns information w.r.t the on chain
@@ -1374,6 +1596,19 @@ export interface TaprootAssets {
         onMessage?: (msg: SendEvent) => void,
         onError?: (err: Error) => void
     ): void;
+    /**
+     * RegisterTransfer informs the daemon about a new inbound transfer that has
+     * happened. This is used for interactive transfers where no TAP address is
+     * involved and the recipient is aware of the transfer through an out-of-band
+     * protocol but the daemon hasn't been informed about the completion of the
+     * transfer. For this to work, the proof must already be in the recipient's
+     * local universe (e.g. through the use of the universerpc.InsertProof RPC or
+     * the universe proof courier and universe sync mechanisms) and this call
+     * simply instructs the daemon to detect the transfer as an asset it owns.
+     */
+    registerTransfer(
+        request?: DeepPartial<RegisterTransferRequest>
+    ): Promise<RegisterTransferResponse>;
 }
 
 type Builtin =
