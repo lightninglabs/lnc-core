@@ -6,7 +6,7 @@
   "types": "./dist/index.d.ts",
   "config": {
     "lnd_release_tag": "v0.19.1-beta",
-    "loop_release_tag": "v0.31.2-beta",
+    "loop_release_tag": "v0.31.7-beta",
     "pool_release_tag": "v0.6.6-beta",
     "faraday_release_tag": "v0.2.16-alpha",
     "tapd_release_tag": "v0.6.0",
