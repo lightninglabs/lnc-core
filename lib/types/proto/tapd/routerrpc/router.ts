@@ -846,6 +846,16 @@ export interface DeleteAliasesResponse {
     aliasMaps: AliasMap[];
 }
 
+export interface FindBaseAliasRequest {
+    /** The alias we want to look up the base scid for. */
+    alias: string;
+}
+
+export interface FindBaseAliasResponse {
+    /** The base scid that resulted from the base scid look up. */
+    base: string;
+}
+
 /**
  * Router is a service that offers advanced interaction with the router
  * subsystem of the daemon.
@@ -1053,6 +1063,13 @@ export interface Router {
     xDeleteLocalChanAliases(
         request?: DeepPartial<DeleteAliasesRequest>
     ): Promise<DeleteAliasesResponse>;
+    /**
+     * XFindBaseLocalChanAlias is an experimental API that looks up the base scid
+     * for a local chan alias that was registered during the current runtime.
+     */
+    xFindBaseLocalChanAlias(
+        request?: DeepPartial<FindBaseAliasRequest>
+    ): Promise<FindBaseAliasResponse>;
 }
 
 type Builtin =

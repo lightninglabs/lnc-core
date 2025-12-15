@@ -5,12 +5,12 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "config": {
-    "lnd_release_tag": "v0.19.1-beta",
-    "loop_release_tag": "v0.31.2-beta",
-    "pool_release_tag": "v0.6.6-beta",
-    "faraday_release_tag": "v0.2.16-alpha",
-    "tapd_release_tag": "v0.6.0",
-    "lit_release_tag": "v0.15.0-alpha",
+    "lnd_release_tag": "v0.20.0-beta",
+    "loop_release_tag": "v0.31.7-beta",
+    "pool_release_tag": "v0.6.4-beta",
+    "faraday_release_tag": "v0.2.14-alpha",
+    "tapd_release_tag": "v0.7.0",
+    "lit_release_tag": "v0.16.0-alpha",
     "protoc_version": "21.9"
   },
   "scripts": {

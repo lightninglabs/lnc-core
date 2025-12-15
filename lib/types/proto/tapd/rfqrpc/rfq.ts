@@ -82,10 +82,7 @@ export interface AddAssetBuyOrderRequest {
     assetMaxAmt: string;
     /** The unix timestamp in seconds after which the order is no longer valid. */
     expiry: string;
-    /**
-     * peer_pub_key is an optional field for specifying the public key of the
-     * intended recipient peer for the order.
-     */
+    /** The public key of the intended recipient peer for the order. */
     peerPubKey: Uint8Array | string;
     /**
      * timeout_seconds is the number of seconds to wait for the peer to respond
@@ -99,6 +96,17 @@ export interface AddAssetBuyOrderRequest {
      * scenarios.
      */
     skipAssetChannelCheck: boolean;
+    /**
+     * An optional text field that can be used to provide additional metadata
+     * about the buy order to the price oracle. This can include information
+     * about the wallet end user that initiated the transaction, or any
+     * authentication information that the price oracle can use to give out a
+     * more accurate (or discount) asset rate. Though not verified or enforced
+     * by tapd, the suggested format for this field is a JSON string.
+     * This field is optional and can be left empty if no metadata is available.
+     * The maximum length of this field is 32'768 bytes.
+     */
+    priceOracleMetadata: string;
 }
 
 export interface AddAssetBuyOrderResponse {
@@ -129,10 +137,7 @@ export interface AddAssetSellOrderRequest {
     paymentMaxAmt: string;
     /** The unix timestamp in seconds after which the order is no longer valid. */
     expiry: string;
-    /**
-     * peer_pub_key is an optional field for specifying the public key of the
-     * intended recipient peer for the order.
-     */
+    /** The public key of the intended recipient peer for the order. */
     peerPubKey: Uint8Array | string;
     /**
      * timeout_seconds is the number of seconds to wait for the peer to respond
@@ -146,6 +151,17 @@ export interface AddAssetSellOrderRequest {
      * scenarios.
      */
     skipAssetChannelCheck: boolean;
+    /**
+     * An optional text field that can be used to provide additional metadata
+     * about the sell order to the price oracle. This can include information
+     * about the wallet end user that initiated the transaction, or any
+     * authentication information that the price oracle can use to give out a
+     * more accurate (or discount) asset rate. Though not verified or enforced
+     * by tapd, the suggested format for this field is a JSON string.
+     * This field is optional and can be left empty if no metadata is available.
+     * The maximum length of this field is 32'768 bytes.
+     */
+    priceOracleMetadata: string;
 }
 
 export interface AddAssetSellOrderResponse {
@@ -186,6 +202,17 @@ export interface AddAssetBuyOfferResponse {}
 
 export interface QueryPeerAcceptedQuotesRequest {}
 
+export interface AssetSpec {
+    /** The 32-byte asset ID specified as raw bytes. */
+    id: Uint8Array | string;
+    /**
+     * The 32-byte asset group public key, serialized in BIP340 format.
+     * BIP340 defines a canonical encoding for Schnorr public keys.
+     * This field is serialized using schnorr.SerializePubKey.
+     */
+    groupPubKey: Uint8Array | string;
+}
+
 export interface PeerAcceptedBuyQuote {
     /** Quote counterparty peer. */
     peer: string;
@@ -217,6 +244,16 @@ export interface PeerAcceptedBuyQuote {
      * HTLC to be above the dust limit.
      */
     minTransportableUnits: string;
+    /**
+     * An optional user-provided text field used to provide additional metadata
+     * about the buy order to the price oracle. This can include information
+     * about the wallet end user that initiated the transaction, or any
+     * authentication information that the price oracle can use to give out a
+     * more accurate (or discount) asset rate.
+     */
+    priceOracleMetadata: string;
+    /** The subject asset specifier. */
+    assetSpec: AssetSpec | undefined;
 }
 
 export interface PeerAcceptedSellQuote {
@@ -246,6 +283,16 @@ export interface PeerAcceptedSellQuote {
      * milli-satoshis.
      */
     minTransportableMsat: string;
+    /**
+     * An optional user-provided text field used to provide additional metadata
+     * about the sell order to the price oracle. This can include information
+     * about the wallet end user that initiated the transaction, or any
+     * authentication information that the price oracle can use to give out a
+     * more accurate (or discount) asset rate.
+     */
+    priceOracleMetadata: string;
+    /** The subject asset specifier. */
+    assetSpec: AssetSpec | undefined;
 }
 
 /**

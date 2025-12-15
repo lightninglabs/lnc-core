@@ -1,10 +1,11 @@
 /* eslint-disable */
 import type {
-    OutPoint,
+    AddressWithAmount,
     KeyDescriptor,
     ScriptKey,
     SendAssetResponse
 } from '../taprootassets';
+import type { OutPoint } from '../tapcommon';
 
 export enum CoinSelectType {
     /**
@@ -68,10 +69,23 @@ export interface TxTemplate {
      */
     inputs: PrevId[];
     /**
-     * A map of all Taproot Asset addresses mapped to the anchor transaction's
-     * output index that should be sent to.
+     * DEPRECATED: A map of all Taproot Asset addresses that should be sent to.
+     * The keys are the Taproot Asset addresses in human-readable form, and the
+     * values are IGNORED and should not be set (use the addresses_with_amounts
+     * field below instead). The recipients map and addresses_with_amounts list
+     * are mutually exclusive, meaning that if addresses_with_amounts is set, then
+     * recipients must be empty, and vice versa.
      */
     recipients: { [key: string]: string };
+    /**
+     * A list of addresses and the amounts of asset units to send to them. This
+     * must be used for V2 TAP addresses that don't specify an amount in the
+     * address itself and allow the sender to choose the amount to send. The
+     * recipients and addresses_with_amounts lists are mutually exclusive,
+     * meaning that if addresses_with_amounts is set, then recipients must be
+     * empty, and vice versa.
+     */
+    addressesWithAmounts: AddressWithAmount[];
 }
 
 export interface TxTemplate_RecipientsEntry {
@@ -255,18 +269,25 @@ export interface PublishAndLogRequest {
 }
 
 export interface NextInternalKeyRequest {
+    /** The key family to derive the next internal key for. */
     keyFamily: number;
 }
 
 export interface NextInternalKeyResponse {
+    /** The full key descriptor of the internal key that was derived. */
     internalKey: KeyDescriptor | undefined;
 }
 
 export interface NextScriptKeyRequest {
+    /** The key family to derive the next script key for. */
     keyFamily: number;
 }
 
 export interface NextScriptKeyResponse {
+    /**
+     * The full script key information that was derived, including the
+     * internal key and the tweaked script key.
+     */
     scriptKey: ScriptKey | undefined;
 }
 
@@ -279,6 +300,7 @@ export interface QueryInternalKeyRequest {
 }
 
 export interface QueryInternalKeyResponse {
+    /** The full key descriptor of the internal key that was queried. */
     internalKey: KeyDescriptor | undefined;
 }
 
@@ -292,12 +314,25 @@ export interface QueryScriptKeyRequest {
 }
 
 export interface QueryScriptKeyResponse {
+    /**
+     * The full script key information that was queried, including the
+     * internal key and the tweaked script key.
+     */
     scriptKey: ScriptKey | undefined;
 }
 
 export interface ProveAssetOwnershipRequest {
+    /**
+     * The asset ID of the asset to prove ownership of. This is the 32-byte
+     * asset ID that identifies a particular asset or tranche of assets.
+     */
     assetId: Uint8Array | string;
+    /** The script key that is used to spend the asset. */
     scriptKey: Uint8Array | string;
+    /**
+     * The outpoint of the asset UTXO that is being proven to be owned by the
+     * prover.
+     */
     outpoint: OutPoint | undefined;
     /**
      * An optional 32-byte challenge that may be used to bind the generated
@@ -312,6 +347,10 @@ export interface ProveAssetOwnershipResponse {
 }
 
 export interface VerifyAssetOwnershipRequest {
+    /**
+     * The full ownership proof that was generated, including the witness data
+     * that contains the proving signature.
+     */
     proofWithWitness: Uint8Array | string;
     /**
      * An optional 32-byte challenge that may be used to check the ownership
@@ -322,6 +361,7 @@ export interface VerifyAssetOwnershipRequest {
 }
 
 export interface VerifyAssetOwnershipResponse {
+    /** Whether the ownership proof is valid or not. */
     validProof: boolean;
     /** The outpoint the proof commits to. */
     outpoint: OutPoint | undefined;
@@ -343,10 +383,15 @@ export interface RemoveUTXOLeaseRequest {
 export interface RemoveUTXOLeaseResponse {}
 
 export interface DeclareScriptKeyRequest {
+    /** The script key the wallet should be informed about. */
     scriptKey: ScriptKey | undefined;
 }
 
 export interface DeclareScriptKeyResponse {
+    /**
+     * The script key that was declared, including the internal key and the
+     * tweaked script key.
+     */
     scriptKey: ScriptKey | undefined;
 }
 
@@ -444,6 +489,7 @@ export interface AssetWallet {
         request?: DeepPartial<VerifyAssetOwnershipRequest>
     ): Promise<VerifyAssetOwnershipResponse>;
     /**
+     * `tapcli: assets removelease`
      * RemoveUTXOLease removes the lease/lock/reservation of the given managed
      * UTXO.
      */

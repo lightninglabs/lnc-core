@@ -1,4 +1,5 @@
 /* eslint-disable */
+import type { OutPoint } from './tapcommon';
 
 export enum AssetType {
     /**
@@ -91,14 +92,19 @@ export enum AddrVersion {
      * commitments.
      */
     ADDR_VERSION_V1 = 'ADDR_VERSION_V1',
+    /**
+     * ADDR_VERSION_V2 - ADDR_VERSION_V2 is the address version that supports sending grouped
+     * assets and require the new auth mailbox proof courier address format.
+     */
+    ADDR_VERSION_V2 = 'ADDR_VERSION_V2',
     UNRECOGNIZED = 'UNRECOGNIZED'
 }
 
 export enum ScriptKeyType {
     /**
      * SCRIPT_KEY_UNKNOWN - The type of script key is not known. This should only be stored for assets
-     * where we don't know the internal key of the script key (e.g. for
-     * imported proofs).
+     * where we don't know the internal key of the script key (e.g. for imported
+     * proofs).
      */
     SCRIPT_KEY_UNKNOWN = 'SCRIPT_KEY_UNKNOWN',
     /**
@@ -134,6 +140,16 @@ export enum ScriptKeyType {
      * selection.
      */
     SCRIPT_KEY_CHANNEL = 'SCRIPT_KEY_CHANNEL',
+    /**
+     * SCRIPT_KEY_UNIQUE_PEDERSEN - The script key is derived using the asset ID and a single leaf that contains
+     * an un-spendable Pedersen commitment key
+     * `(OP_CHECKSIG <NUMS_key + asset_id * G>)`. This can be used to create
+     * unique script keys for each virtual packet in the fragment, to avoid proof
+     * collisions in the universe, where the script keys should be spendable by
+     * a hardware wallet that only supports miniscript policies for signing P2TR
+     * outputs.
+     */
+    SCRIPT_KEY_UNIQUE_PEDERSEN = 'SCRIPT_KEY_UNIQUE_PEDERSEN',
     UNRECOGNIZED = 'UNRECOGNIZED'
 }
 
@@ -229,8 +245,23 @@ export interface AssetMeta {
 }
 
 export interface ListAssetRequest {
+    /**
+     * Whether to include each asset's witness in the response. The witness
+     * either contains the spending signatures or the split commitment witness,
+     * which can both be large and usually aren't very useful on the command
+     * line, so are omitted by default.
+     */
     withWitness: boolean;
+    /**
+     * Include assets that are marked as spent (which is always true for burn
+     * or tombstone assets).
+     */
     includeSpent: boolean;
+    /**
+     * Include assets that are leased (locked/reserved) by the daemon for a
+     * pending transfer. Leased assets cannot be used by the daemon until the
+     * pending transfer is confirmed or the lease expires.
+     */
     includeLeased: boolean;
     /**
      * List assets that aren't confirmed yet. Only freshly minted assets will
@@ -485,6 +516,11 @@ export interface Asset {
     assetGroup: AssetGroup | undefined;
     /** Describes where in the chain the asset is currently anchored. */
     chainAnchor: AnchorInfo | undefined;
+    /**
+     * The asset's previous witnesses, which either contain the spending
+     * witness stack (usually a signature) or the split commitment witness
+     * (which is used to prove the split commitment of a split asset).
+     */
     prevWitnesses: PrevWitness[];
     /** Indicates whether the asset has been spent. */
     isSpent: boolean;
@@ -541,16 +577,34 @@ export interface Asset {
 }
 
 export interface PrevWitness {
+    /** The previous input asset that this witness is for. */
     prevId: PrevInputAsset | undefined;
+    /**
+     * The witness stack that is used to prove the asset owner's authorization
+     * to spend an asset. This is only set if the asset is the root asset of an
+     * asset split.
+     */
     txWitness: Uint8Array | string[];
+    /**
+     * The split commitment that is used to prove the split commitment of a
+     * split asset. This is only set if the asset is a split asset.
+     */
     splitCommitment: SplitCommitment | undefined;
 }
 
 export interface SplitCommitment {
+    /**
+     * The root asset that contains the transaction witness that authorizes the
+     * spend of the asset.
+     */
     rootAsset: Asset | undefined;
 }
 
 export interface ListAssetResponse {
+    /**
+     * The list of assets found in the database matching the request query
+     * parameters.
+     */
     assets: Asset[];
     /**
      * This is a count of unconfirmed outgoing transfers. Unconfirmed transfers
@@ -566,6 +620,11 @@ export interface ListAssetResponse {
 }
 
 export interface ListUtxosRequest {
+    /**
+     * Whether to include UTXOs that are marked as leased (locked/reserved) by
+     * the wallet for a pending transfer. Leased UTXOs cannot be used by the
+     * wallet until the pending transfer is confirmed or the lease expires.
+     */
     includeLeased: boolean;
     /**
      * The script key type to filter the assets by. If not set, only assets with
@@ -681,6 +740,8 @@ export interface AssetBalance {
     assetGenesis: GenesisInfo | undefined;
     /** The balance of the asset owned by the target daemon. */
     balance: string;
+    /** The group key of the asset (if it belongs to a group). */
+    groupKey: Uint8Array | string;
 }
 
 export interface AssetGroupBalance {
@@ -691,8 +752,24 @@ export interface AssetGroupBalance {
 }
 
 export interface ListBalancesResponse {
+    /**
+     * The map of asset balances, where the key is the asset ID and the value
+     * is the balance of that asset owned by the target daemon. This is only
+     * set if group_by.asset_id is true in the request.
+     */
     assetBalances: { [key: string]: AssetBalance };
+    /**
+     * The map of asset group balances, where the key is the group key
+     * and the value is the balance of that group owned by the target daemon.
+     * This is only set if group_by.group_key is true in the request.
+     */
     assetGroupBalances: { [key: string]: AssetGroupBalance };
+    /**
+     * This is a count of unconfirmed outgoing transfers. Unconfirmed transfers
+     * (and the change resulting from them) do not appear in the balance. The
+     * balance only represents confirmed assets that are owned by the daemon.
+     */
+    unconfirmedTransfers: string;
 }
 
 export interface ListBalancesResponse_AssetBalancesEntry {
@@ -747,13 +824,23 @@ export interface ChainHash {
 }
 
 export interface AssetTransfer {
+    /** The timestamp of the transfer in UTC Unix time seconds. */
     transferTimestamp: string;
     /**
-     * The new transaction that commits to the set of Taproot Assets found
-     * at the above new anchor point.
+     * The new transaction that commits to the set of Taproot Assets found at
+     * the above new anchor point. Note that this is in raw byte format, not
+     * the reversed hex string format that is used for displayed txids. When
+     * listing assets on the CLI we purposefully use the display format so it
+     * is easier to copy and paste into other tools.
      */
     anchorTxHash: Uint8Array | string;
+    /**
+     * The height hint of the anchor transaction. This is the height at which
+     * the anchor transaction was published, so the actual inclusion height
+     * will be greater than this value.
+     */
     anchorTxHeightHint: number;
+    /** The total fees paid by the anchor transaction in satoshis. */
     anchorTxChainFees: string;
     /** Describes the set of spent assets. */
     inputs: TransferInput[];
@@ -804,34 +891,113 @@ export interface TransferOutputAnchor {
      * chain.
      */
     outpoint: string;
+    /** The anchor transaction output's value in satoshis. */
     value: string;
+    /**
+     * The anchor transaction output's internal key, which is the Taproot
+     * internal key of the on-chain output.
+     */
     internalKey: Uint8Array | string;
+    /**
+     * The Taproot Asset root commitment hash, which is the root of the
+     * Taproot Asset commitment tree for the asset that was created.
+     */
     taprootAssetRoot: Uint8Array | string;
+    /**
+     * The Taproot merkle root hash committed to by the outpoint of this
+     * output. If there is no Tapscript sibling, this is equal to the Taproot
+     * Asset root commitment hash.
+     * If there is a Tapscript sibling, this is the tap branch root hash of the
+     * Taproot Asset root hash and the tapscript sibling.
+     */
     merkleRoot: Uint8Array | string;
+    /**
+     * The serialized preimage of a Tapscript sibling, if there was one. If this
+     * is empty, then the merkle_root hash is equal to the Taproot root hash
+     * of the anchor output.
+     */
     tapscriptSibling: Uint8Array | string;
+    /**
+     * The number of passive assets that were committed to this output.
+     * Passive assets are assets that are not actively spent, but are instead
+     * passively carried along with the main asset and re-anchored in the
+     * anchor output.
+     */
     numPassiveAssets: number;
-    /** pk_script is the pkscript of the anchor output. */
+    /**
+     * The actual output's script, which is the P2TR script for the final
+     * Taproot output key created by this transfer output.
+     */
     pkScript: Uint8Array | string;
 }
 
 export interface TransferOutput {
+    /**
+     * The transfer output's on-chain anchor information, which contains the
+     * BTC-level output information that anchors the Taproot Asset commitment
+     * for this output.
+     */
     anchor: TransferOutputAnchor | undefined;
+    /** The script key of the asset that was created. */
     scriptKey: Uint8Array | string;
+    /**
+     * Indicates whether the script key is known to the wallet of the lnd node
+     * connected to the Taproot Asset daemon. If true, the asset will be shown
+     * in the wallet balance.
+     */
     scriptKeyIsLocal: boolean;
+    /** The amount of the asset that was created in this output. */
     amount: string;
     /**
      * The new individual transition proof (not a full proof file) that proves
      * the inclusion of the new asset within the new AnchorTx.
      */
     newProofBlob: Uint8Array | string;
+    /**
+     * The split commitment root hash of the asset that was created in this
+     * output. This is only set if the asset is a split root output, meaning
+     * that the asset is a split root output that carries the change from a
+     * split or a tombstone from a non-interactive full value send output.
+     */
     splitCommitRootHash: Uint8Array | string;
+    /**
+     * The type of the output. This is used to distinguish between a simple
+     * output that is not a split root and does not carry passive assets, and a
+     * split root output that carries the change from a split or a tombstone
+     * from a non-interactive full value send output.
+     */
     outputType: OutputType;
+    /**
+     * The asset version of the output. This is used to determine how the asset
+     * is encoded in the Taproot Asset commitment tree.
+     */
     assetVersion: AssetVersion;
+    /**
+     * The lock time of the output, which is an optional field that can be set
+     * to delay the spending of the output until a certain time in the future.
+     */
     lockTime: string;
+    /**
+     * The relative lock time of the output, which is an optional field that
+     * can be set to delay the spending of the output relative to the block
+     * height at which the output is confirmed.
+     */
     relativeLockTime: string;
     /** The delivery status of the proof associated with this output. */
     proofDeliveryStatus: ProofDeliveryStatus;
+    /** The asset ID of the asset that was created in this output. */
     assetId: Uint8Array | string;
+    /**
+     * The proof courier address that was used to deliver the proof for this
+     * output.
+     */
+    proofCourierAddr: string;
+    /**
+     * The Taproot Asset address that was used to create the output. This is
+     * only set for new outputs for tapd versions that support the address V2
+     * format. For older versions, this field will be empty.
+     */
+    tapAddr: string;
 }
 
 export interface StopRequest {}
@@ -841,23 +1007,47 @@ export interface StopResponse {}
 export interface DebugLevelRequest {
     /** If true, all the valid debug sub-systems will be returned. */
     show: boolean;
+    /**
+     * If set, the debug level for the sub-system will be set to this value.
+     * Can be one of: "trace", "debug", "info", "warn", "error", "critical",
+     * "off", to set a global level, optionally followed by a comma-separated
+     * list of sub-systems to set the level for. For example:
+     * "debug,TADB=info,UNIV=warn".
+     */
     levelSpec: string;
 }
 
 export interface DebugLevelResponse {
+    /**
+     * The list of available logging sub-systems that can be set to a specific
+     * debug level.
+     */
     subSystems: string;
 }
 
 export interface Addr {
     /** The bech32 encoded Taproot Asset address. */
     encoded: string;
-    /** The asset ID that uniquely identifies the asset. */
+    /**
+     * The asset ID that uniquely identifies the asset. This can be all zeroes
+     * for V2 addresses that have a group key set.
+     */
     assetId: Uint8Array | string;
     /** The type of the asset. */
     assetType: AssetType;
-    /** The total amount of the asset stored in this Taproot Asset UTXO. */
+    /**
+     * The total amount of the asset stored in this Taproot Asset UTXO. The
+     * amount is allowed to be unset for V2 addresses, where the sender will
+     * post a fragment containing the asset IDs and amounts to the proof
+     * courier's auth mailbox.
+     */
     amount: string;
-    /** The group key of the asset (if it exists) */
+    /**
+     * The group key of the asset group to receive assets for. If this field
+     * is set, then any asset of the group can be sent to this address. Can only
+     * be specified for V2 addresses. If this field is set, the asset_id
+     * field must be empty.
+     */
     groupKey: Uint8Array | string;
     /**
      * The specific script key the asset must commit to in order to transfer
@@ -879,7 +1069,11 @@ export interface Addr {
      * transfer assets described in this address.
      */
     taprootOutputKey: Uint8Array | string;
-    /** The address of the proof courier service used in proof transfer. */
+    /**
+     * The address of the proof courier service used in proof transfer. For V2
+     * addresses the proof courier address is mandatory and must be a valid auth
+     * mailbox address (authmailbox+universerpc://host:port).
+     */
     proofCourierAddr: string;
     /** The asset version of the address. */
     assetVersion: AssetVersion;
@@ -905,11 +1099,22 @@ export interface QueryAddrRequest {
 }
 
 export interface QueryAddrResponse {
+    /** The list of addresses that match the query parameters. */
     addrs: Addr[];
 }
 
 export interface NewAddrRequest {
+    /**
+     * The asset ID to create the address for. This is required for V0 and V1
+     * addresses. For V2 addresses, this field is optional and must be empty if the
+     * group key is set.
+     */
     assetId: Uint8Array | string;
+    /**
+     * The number of asset units to be sent to the address. This is required for V0
+     * and V1 addresses. For V2 addresses, this field is optional and can be left
+     * at 0 to indicate that the sender can choose the amount of assets to send.
+     */
     amt: string;
     /**
      * The optional script key that the receiving asset should be locked to. If no
@@ -945,6 +1150,17 @@ export interface NewAddrRequest {
     assetVersion: AssetVersion;
     /** The version of this address. */
     addressVersion: AddrVersion;
+    /**
+     * The group key to receive assets for. This can only be specified for V2
+     * addresses. If this field is set, the asset_id field must be empty.
+     */
+    groupKey: Uint8Array | string;
+    /**
+     * If set, the daemon skips the connectivity check to the proof courier service
+     * when creating an address. Connection checks currently apply only to certain
+     * address schemes. Use this to create addresses while offline.
+     */
+    skipProofCourierConnCheck: boolean;
 }
 
 export interface ScriptKeyTypeQuery {
@@ -1009,6 +1225,7 @@ export interface TapBranch {
 }
 
 export interface DecodeAddrRequest {
+    /** The bech32 encoded Taproot Asset address to decode. */
     addr: string;
 }
 
@@ -1018,6 +1235,10 @@ export interface ProofFile {
      * individual mint/transfer proof.
      */
     rawProofFile: Uint8Array | string;
+    /**
+     * The genesis point of the proof file, which is the asset's genesis
+     * transaction outpoint.
+     */
     genesisPoint: string;
 }
 
@@ -1095,6 +1316,7 @@ export interface DecodedProof {
 }
 
 export interface VerifyProofResponse {
+    /** Whether the proof file was valid or not. */
     valid: boolean;
     /** The decoded last proof in the file if the proof file was valid. */
     decodedProof: DecodedProof | undefined;
@@ -1121,12 +1343,16 @@ export interface DecodeProofRequest {
 }
 
 export interface DecodeProofResponse {
+    /** The decoded, more human-readable proof. */
     decodedProof: DecodedProof | undefined;
 }
 
 export interface ExportProofRequest {
+    /** The asset ID of the asset to export the proof for. */
     assetId: Uint8Array | string;
+    /** The script key of the asset to export the proof for. */
     scriptKey: Uint8Array | string;
+    /** The on-chain outpoint of the asset to export the proof for. */
     outpoint: OutPoint | undefined;
 }
 
@@ -1181,6 +1407,16 @@ export interface AddrReceivesRequest {
     filterAddr: string;
     /** Filter receives by a specific status. Leave empty to get all receives. */
     filterStatus: AddrEventStatus;
+    /**
+     * Filter receives by creation time greater than or equal to this timestamp.
+     * If not set, no start time filtering is applied.
+     */
+    startTimestamp: string;
+    /**
+     * Filter receives by creation time less than or equal to this timestamp.
+     * If not set, no end time filtering is applied.
+     */
+    endTimestamp: string;
 }
 
 export interface AddrReceivesResponse {
@@ -1189,6 +1425,15 @@ export interface AddrReceivesResponse {
 }
 
 export interface SendAssetRequest {
+    /**
+     * The list of TAP addresses to send assets to. The amount to send to each
+     * address is determined by the amount specified in the address itself. For
+     * V2 addresses that are allowed to not specify an amount, use the
+     * addresses_with_amounts list to specify the amount to send to each
+     * address. The tap_addrs and addresses_with_amounts lists are mutually
+     * exclusive, meaning that if addresses_with_amounts is set, then tap_addrs
+     * must be empty, and vice versa.
+     */
     tapAddrs: string[];
     /** The optional fee rate to use for the minting transaction, in sat/kw. */
     feeRate: number;
@@ -1204,29 +1449,79 @@ export interface SendAssetRequest {
      * is not immediately available.
      */
     skipProofCourierPingCheck: boolean;
+    /**
+     * A list of addresses and the amounts of asset units to send to them. This
+     * must be used for V2 TAP addresses that don't specify an amount in the
+     * address itself and allow the sender to choose the amount to send. The
+     * tap_addrs and addresses_with_amounts lists are mutually exclusive,
+     * meaning that if addresses_with_amounts is set, then tap_addrs must be
+     * empty, and vice versa.
+     */
+    addressesWithAmounts: AddressWithAmount[];
+}
+
+export interface AddressWithAmount {
+    /** The TAP address to send assets to. */
+    tapAddr: string;
+    /**
+     * The amount of asset units to send to the address. This is only used for
+     * re-usable V2 addresses that don't specify an amount in the address itself
+     * and allow the sender to specify the amount on each send attempt. For V0
+     * or V1 addresses, this can be left empty (zero) as the amount is taken
+     * from the address itself.
+     */
+    amount: string;
 }
 
 export interface PrevInputAsset {
+    /**
+     * The previous input's anchor point, which is the on-chain outpoint the
+     * asset was anchored to.
+     */
     anchorPoint: string;
+    /** The asset ID of the asset that was spent as an input. */
     assetId: Uint8Array | string;
+    /** The script key of the asset that was spent as an input. */
     scriptKey: Uint8Array | string;
+    /** The amount of the asset that was spent as an input. */
     amount: string;
 }
 
 export interface SendAssetResponse {
+    /** The transfer that was created to send assets to one or more addresses. */
     transfer: AssetTransfer | undefined;
 }
 
 export interface GetInfoRequest {}
 
 export interface GetInfoResponse {
+    /** The full version string of the Taproot Asset daemon. */
     version: string;
+    /** The full version string of the LND node that this daemon is connected to. */
     lndVersion: string;
+    /**
+     * The network this daemon is connected to, e.g. "mainnet", "testnet", or
+     * any other supported network.
+     */
     network: string;
+    /** The public key of the LND node that this daemon is connected to. */
     lndIdentityPubkey: string;
+    /** The alias of the LND node that this daemon is connected to. */
     nodeAlias: string;
+    /**
+     * The current block height as seen by the LND node this daemon is
+     * connected to.
+     */
     blockHeight: number;
+    /**
+     * The current block hash as seen by the LND node this daemon is connected
+     * to.
+     */
     blockHash: string;
+    /**
+     * Whether the LND node this daemon is connected to is synced to the
+     * Bitcoin chain.
+     */
     syncToChain: boolean;
 }
 
@@ -1241,11 +1536,58 @@ export interface FetchAssetMetaRequest {
     metaHashStr: string | undefined;
 }
 
+export interface FetchAssetMetaResponse {
+    /**
+     * The raw data of the asset meta data. Based on the type below, this may be
+     * structured data such as a text file or PDF. The size of the data is limited
+     * to 1MiB.
+     */
+    data: Uint8Array | string;
+    /** The type of the asset meta data. */
+    type: AssetMetaType;
+    /**
+     * The hash of the meta. This is the hash of the TLV serialization of the meta
+     * itself.
+     */
+    metaHash: Uint8Array | string;
+    /**
+     * A map of unknown odd TLV types that were encountered during asset meta data
+     * decoding.
+     */
+    unknownOddTypes: { [key: string]: Uint8Array | string };
+    /**
+     * The decimal display value of the asset. This is used to determine the number
+     * of decimal places to display when presenting the asset amount to the user.
+     */
+    decimalDisplay: number;
+    /**
+     * Boolean flag indicating whether the asset-group issuer publishes
+     * universe-supply commitments to the canonical universe set.
+     */
+    universeCommitments: boolean;
+    /**
+     * List of canonical universe URLs where the asset-group issuer publishes
+     * asset-related proofs.
+     */
+    canonicalUniverseUrls: string[];
+    /**
+     * The public key that is used to verify universe supply commitment related
+     * on-chain outputs and proofs.
+     */
+    delegationKey: Uint8Array | string;
+}
+
+export interface FetchAssetMetaResponse_UnknownOddTypesEntry {
+    key: string;
+    value: Uint8Array | string;
+}
+
 export interface BurnAssetRequest {
     /** The asset ID of the asset to burn units of. */
     assetId: Uint8Array | string | undefined;
     /** The hex encoded asset ID of the asset to burn units of. */
     assetIdStr: string | undefined;
+    /** The number of asset units to burn. This must be greater than zero. */
     amountToBurn: string;
     /**
      * A safety check to ensure the user is aware of the destructive nature of
@@ -1287,14 +1629,8 @@ export interface AssetBurn {
 }
 
 export interface ListBurnsResponse {
+    /** The list of asset burns that match the query parameters. */
     burns: AssetBurn[];
-}
-
-export interface OutPoint {
-    /** Raw bytes representing the transaction id. */
-    txid: Uint8Array | string;
-    /** The index of the output on the transaction. */
-    outputIndex: number;
 }
 
 export interface SubscribeReceiveEventsRequest {
@@ -1343,6 +1679,11 @@ export interface SubscribeSendEventsRequest {
      * transfer label.
      */
     filterLabel: string;
+    /**
+     * The start time as a Unix timestamp in microseconds. If not set (default
+     * value 0), the daemon will start streaming events from the current time.
+     */
+    startTimestamp: string;
 }
 
 export interface SendEvent {
@@ -1389,6 +1730,10 @@ export interface SendEvent {
 }
 
 export interface AnchorTransaction {
+    /**
+     * The on-chain anchor transaction PSBT packet that was created by the
+     * daemon.
+     */
     anchorPsbt: Uint8Array | string;
     /** The index of the (added) change output or -1 if no change was left over. */
     changeOutputIndex: number;
@@ -1421,6 +1766,7 @@ export interface RegisterTransferRequest {
 }
 
 export interface RegisterTransferResponse {
+    /** The asset transfer that was registered. */
     registeredAsset: Asset | undefined;
 }
 
@@ -1575,7 +1921,7 @@ export interface TaprootAssets {
      */
     fetchAssetMeta(
         request?: DeepPartial<FetchAssetMetaRequest>
-    ): Promise<AssetMeta>;
+    ): Promise<FetchAssetMetaResponse>;
     /**
      * tapcli: `events receive`
      * SubscribeReceiveEvents allows a caller to subscribe to receive events for

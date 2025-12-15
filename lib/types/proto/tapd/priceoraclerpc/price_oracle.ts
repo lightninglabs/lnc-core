@@ -9,6 +9,75 @@ export enum TransactionType {
 }
 
 /**
+ * Intent is an enum informing the price oracle about the intent of the price
+ * rate query. This is used to provide context for the asset rates being
+ * requested, allowing the price oracle to tailor the response based on the
+ * specific use case, such as paying an invoice or receiving a payment and the
+ * different stages involved in those.
+ */
+export enum Intent {
+    /**
+     * INTENT_UNSPECIFIED - INTENT_UNSPECIFIED is used to indicate that the intent of the price rate
+     * query is not specified. This is the fallback default value and should not
+     * be used in production code. It is primarily used for backward
+     * compatibility with older versions of the protocol that did not include
+     * intent information.
+     */
+    INTENT_UNSPECIFIED = 'INTENT_UNSPECIFIED',
+    /**
+     * INTENT_PAY_INVOICE_HINT - INTENT_PAY_INVOICE_HINT is used to indicate that the user is requesting
+     * a price rate hint for paying an invoice. This is typically used by the
+     * payer of an invoice to provide a suggestion of the expected asset rate to
+     * the RFQ peer (edge node) that will determine the actual rate for the
+     * payment.
+     */
+    INTENT_PAY_INVOICE_HINT = 'INTENT_PAY_INVOICE_HINT',
+    /**
+     * INTENT_PAY_INVOICE - INTENT_PAY_INVOICE is used to indicate that a peer wants to pay an
+     * invoice with assets. This is typically used by the edge node that
+     * facilitates the swap from assets to BTC for the payer of an invoice. This
+     * intent is used to provide the actual asset rate for the payment, which
+     * may differ from the hint provided by the payer.
+     */
+    INTENT_PAY_INVOICE = 'INTENT_PAY_INVOICE',
+    /**
+     * INTENT_PAY_INVOICE_QUALIFY - INTENT_PAY_INVOICE_QUALIFY is used to indicate that the payer of an
+     * invoice has received an asset rate from their RFQ peer (edge node) and is
+     * qualifying the rate for the payment. This is typically used by the payer
+     * of an invoice to ensure that the asset rate provided by their peer (edge
+     * node) is acceptable before proceeding with the payment.
+     */
+    INTENT_PAY_INVOICE_QUALIFY = 'INTENT_PAY_INVOICE_QUALIFY',
+    /**
+     * INTENT_RECV_PAYMENT_HINT - INTENT_RECV_PAYMENT_HINT is used to indicate that the user is requesting
+     * a price rate hint for receiving a payment through an invoice. This is
+     * typically used by the creator of an invoice to provide a suggestion of
+     * the expected asset rate to the RFQ peer (edge node) that will determine
+     * the actual rate used for creating an invoice.
+     */
+    INTENT_RECV_PAYMENT_HINT = 'INTENT_RECV_PAYMENT_HINT',
+    /**
+     * INTENT_RECV_PAYMENT - INTENT_RECV_PAYMENT is used to indicate that a peer wants to create an
+     * invoice to receive a payment with assets. This is typically used by the
+     * edge node that facilitates the swap from BTC to assets for the receiver
+     * of a payment. This intent is used to provide the actual asset rate for
+     * the invoice creation, which may differ from the hint provided by the
+     * receiver.
+     */
+    INTENT_RECV_PAYMENT = 'INTENT_RECV_PAYMENT',
+    /**
+     * INTENT_RECV_PAYMENT_QUALIFY - INTENT_RECV_PAYMENT_QUALIFY is used to indicate that the creator of an
+     * invoice received an asset rate from their RFQ peer (edge node) and is
+     * qualifying the rate for the creation of the invoice. This is typically
+     * used by the creator of an invoice to ensure that the asset rate provided
+     * by their peer (edge node) is acceptable before proceeding with creating
+     * the invoice.
+     */
+    INTENT_RECV_PAYMENT_QUALIFY = 'INTENT_RECV_PAYMENT_QUALIFY',
+    UNRECOGNIZED = 'UNRECOGNIZED'
+}
+
+/**
  * FixedPoint is a scaled integer representation of a fractional number.
  *
  * This type consists of two integer fields: a coefficient and a scale.
@@ -131,6 +200,35 @@ export interface QueryAssetRatesRequest {
      * transaction, intended to provide guidance on expected pricing.
      */
     assetRatesHint: AssetRates | undefined;
+    /**
+     * intent informs the price oracle about the stage of the payment flow that
+     * lead to the price rate query. This is used to provide context for the
+     * asset rates being requested, allowing the price oracle to tailor the
+     * response based on the specific use case, such as paying an invoice or
+     * receiving a payment and the different stages involved in those. This
+     * field will only be set by tapd v0.7.0 and later.
+     */
+    intent: Intent;
+    /**
+     * counterparty_id is the 33-byte public key of the peer that is on the
+     * opposite side of the transaction. This field will only be set by tapd
+     * v0.7.0 and later and only if the user initiating the transaction (sending
+     * a payment or creating an invoice) opted in to sharing their peer ID with
+     * the price oracle.
+     */
+    counterpartyId: Uint8Array | string;
+    /**
+     * metadata is an optional text field that can be used to provide
+     * additional metadata about the transaction to the price oracle. This can
+     * include information about the wallet end user that initiated the
+     * transaction, or any authentication information that the price oracle
+     * can use to give out a more accurate (or discount) asset rate. Though not
+     * verified or enforced by tapd, the suggested format for this field is a
+     * JSON string. This field is optional and can be left empty if no metadata
+     * is available. The maximum length of this field is 32'768 bytes. This
+     * field will only be set by tapd v0.7.0 and later.
+     */
+    metadata: string;
 }
 
 /**

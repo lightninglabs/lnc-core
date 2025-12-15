@@ -70,6 +70,7 @@ export interface RouterSendPaymentData_AssetAmountsEntry {
 }
 
 export interface EncodeCustomRecordsRequest {
+    /** The custom records to encode for a payment request. */
     routerSendPayment: RouterSendPaymentData | undefined;
 }
 
@@ -101,8 +102,8 @@ export interface SendPaymentRequest {
     assetAmount: string;
     /**
      * The node identity public key of the peer to ask for a quote for sending
-     * out the assets and converting them to satoshis. This must be specified if
-     * there are multiple channels with the given asset ID.
+     * out the assets and converting them to satoshis. If set, only a quote with
+     * this peer may be negotiated to carry out the payment.
      */
     peerPubkey: Uint8Array | string;
     /**
@@ -135,6 +136,26 @@ export interface SendPaymentRequest {
      * Mutually exclusive to asset_id.
      */
     groupKey: Uint8Array | string;
+    /**
+     * An optional text field that can be used to provide additional metadata
+     * about the payment to the price oracle. This can include information
+     * about the wallet end user that initiated the transaction, or any
+     * authentication information that the price oracle can use to give out a
+     * more accurate (or discount) asset rate. Though not verified or enforced
+     * by tapd, the suggested format for this field is a JSON string.
+     * This field is optional and can be left empty if no metadata is available.
+     * The maximum length of this field is 32'768 bytes.
+     */
+    priceOracleMetadata: string;
+}
+
+export interface AcceptedSellQuotes {
+    /**
+     * If swapping of assets is necessary to carry out the payment, a number of
+     * RFQ quotes may be negotiated for that purpose. The following field
+     * contains all the sell orders that were negotiated with our peers.
+     */
+    acceptedSellOrders: PeerAcceptedSellQuote[];
 }
 
 export interface SendPaymentResponse {
@@ -143,17 +164,28 @@ export interface SendPaymentResponse {
      * sell order is negotiated with the channel peer. The result will be
      * the first message in the response stream. If no swap is needed, the
      * payment results will be streamed directly.
+     * Deprecated. This will now only contain the first quote that was
+     * negotiated. Since the introduction of multi-rfq we now negotiate
+     * multiple quotes in the context of a payment. Use the new field named
+     * "accepted_sell_orders" to retrieve all of them.
      */
     acceptedSellOrder: PeerAcceptedSellQuote | undefined;
     /**
-     * The payment result of a single payment attempt. Multiple attempts may
-     * be returned per payment request until either the payment succeeds or
-     * the payment times out.
+     * If swapping of assets is necessary to carry out the payment, a number
+     * of RFQ quotes may be negotiated for that purpose. The following field
+     * contains all the sell orders that were negotiated with our peers.
+     */
+    acceptedSellOrders: AcceptedSellQuotes | undefined;
+    /**
+     * The payment result of a single payment attempt. Multiple attempts
+     * may be returned per payment request until either the payment
+     * succeeds or the payment times out.
      */
     paymentResult: Payment | undefined;
 }
 
 export interface HodlInvoice {
+    /** The payment hash of the HODL invoice to be created. */
     paymentHash: Uint8Array | string;
 }
 
@@ -196,6 +228,17 @@ export interface AddInvoiceRequest {
      * settle this invoice. Mutually exclusive to asset_id.
      */
     groupKey: Uint8Array | string;
+    /**
+     * An optional text field that can be used to provide additional metadata
+     * about the invoice to the price oracle. This can include information
+     * about the wallet end user that initiated the transaction, or any
+     * authentication information that the price oracle can use to give out a
+     * more accurate (or discount) asset rate. Though not verified or enforced
+     * by tapd, the suggested format for this field is a JSON string.
+     * This field is optional and can be left empty if no metadata is available.
+     * The maximum length of this field is 32'768 bytes.
+     */
+    priceOracleMetadata: string;
 }
 
 export interface AddInvoiceResponse {
@@ -221,6 +264,17 @@ export interface AssetPayReq {
      * Mutually exclusive to asset_id.
      */
     groupKey: Uint8Array | string;
+    /**
+     * An optional text field that can be used to provide additional metadata
+     * about the invoice to the price oracle. This can include information
+     * about the wallet end user that initiated the transaction, or any
+     * authentication information that the price oracle can use to give out a
+     * more accurate (or discount) asset rate. Though not verified or enforced
+     * by tapd, the suggested format for this field is a JSON string.
+     * This field is optional and can be left empty if no metadata is available.
+     * The maximum length of this field is 32'768 bytes.
+     */
+    priceOracleMetadata: string;
 }
 
 export interface AssetPayReqResponse {
@@ -251,11 +305,14 @@ export interface TaprootAssetChannels {
         request?: DeepPartial<FundChannelRequest>
     ): Promise<FundChannelResponse>;
     /**
+     * Deprecated.
      * EncodeCustomRecords allows RPC users to encode Taproot Asset channel related
      * data into the TLV format that is used in the custom records of the lnd
      * payment or other channel related RPCs. This RPC is completely stateless and
      * does not perform any checks on the data provided, other than pure format
      * validation.
+     *
+     * @deprecated
      */
     encodeCustomRecords(
         request?: DeepPartial<EncodeCustomRecordsRequest>

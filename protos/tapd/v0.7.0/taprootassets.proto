@@ -1,5 +1,7 @@
 syntax = "proto3";
 
+import "tapcommon.proto";
+
 package taprpc;
 
 option go_package = "github.com/lightninglabs/taproot-assets/taprpc";
@@ -127,7 +129,7 @@ service TaprootAssets {
     FetchAssetMeta allows a caller to fetch the reveal meta data for an asset
     either by the asset ID for that asset, or a meta hash.
     */
-    rpc FetchAssetMeta (FetchAssetMetaRequest) returns (AssetMeta);
+    rpc FetchAssetMeta (FetchAssetMetaRequest) returns (FetchAssetMetaResponse);
 
     /* tapcli: `events receive`
     SubscribeReceiveEvents allows a caller to subscribe to receive events for
@@ -206,8 +208,19 @@ message AssetMeta {
 }
 
 message ListAssetRequest {
+    // Whether to include each asset's witness in the response. The witness
+    // either contains the spending signatures or the split commitment witness,
+    // which can both be large and usually aren't very useful on the command
+    // line, so are omitted by default.
     bool with_witness = 1;
+
+    // Include assets that are marked as spent (which is always true for burn
+    // or tombstone assets).
     bool include_spent = 2;
+
+    // Include assets that are leased (locked/reserved) by the daemon for a
+    // pending transfer. Leased assets cannot be used by the daemon until the
+    // pending transfer is confirmed or the lease expires.
     bool include_leased = 3;
 
     // List assets that aren't confirmed yet. Only freshly minted assets will
@@ -508,6 +521,9 @@ message Asset {
     // Describes where in the chain the asset is currently anchored.
     AnchorInfo chain_anchor = 12;
 
+    // The asset's previous witnesses, which either contain the spending
+    // witness stack (usually a signature) or the split commitment witness
+    // (which is used to prove the split commitment of a split asset).
     repeated PrevWitness prev_witnesses = 13;
 
     // Indicates whether the asset has been spent.
@@ -558,18 +574,28 @@ message Asset {
 }
 
 message PrevWitness {
+    // The previous input asset that this witness is for.
     PrevInputAsset prev_id = 1;
 
+    // The witness stack that is used to prove the asset owner's authorization
+    // to spend an asset. This is only set if the asset is the root asset of an
+    // asset split.
     repeated bytes tx_witness = 2;
 
+    // The split commitment that is used to prove the split commitment of a
+    // split asset. This is only set if the asset is a split asset.
     SplitCommitment split_commitment = 3;
 }
 
 message SplitCommitment {
+    // The root asset that contains the transaction witness that authorizes the
+    // spend of the asset.
     Asset root_asset = 1;
 }
 
 message ListAssetResponse {
+    // The list of assets found in the database matching the request query
+    // parameters.
     repeated Asset assets = 1;
 
     // This is a count of unconfirmed outgoing transfers. Unconfirmed transfers
@@ -583,6 +609,9 @@ message ListAssetResponse {
 }
 
 message ListUtxosRequest {
+    // Whether to include UTXOs that are marked as leased (locked/reserved) by
+    // the wallet for a pending transfer. Leased UTXOs cannot be used by the
+    // wallet until the pending transfer is confirmed or the lease expires.
     bool include_leased = 1;
 
     // The script key type to filter the assets by. If not set, only assets with
@@ -702,6 +731,9 @@ message AssetBalance {
 
     // The balance of the asset owned by the target daemon.
     uint64 balance = 3;
+
+    // The group key of the asset (if it belongs to a group).
+    bytes group_key = 4;
 }
 
 message AssetGroupBalance {
@@ -713,9 +745,20 @@ message AssetGroupBalance {
 }
 
 message ListBalancesResponse {
+    // The map of asset balances, where the key is the asset ID and the value
+    // is the balance of that asset owned by the target daemon. This is only
+    // set if group_by.asset_id is true in the request.
     map<string, AssetBalance> asset_balances = 1;
 
+    // The map of asset group balances, where the key is the group key
+    // and the value is the balance of that group owned by the target daemon.
+    // This is only set if group_by.group_key is true in the request.
     map<string, AssetGroupBalance> asset_group_balances = 2;
+
+    // This is a count of unconfirmed outgoing transfers. Unconfirmed transfers
+    // (and the change resulting from them) do not appear in the balance. The
+    // balance only represents confirmed assets that are owned by the daemon.
+    uint64 unconfirmed_transfers = 3;
 }
 
 message ListTransfersRequest {
@@ -753,14 +796,22 @@ message ChainHash {
 }
 
 message AssetTransfer {
+    // The timestamp of the transfer in UTC Unix time seconds.
     int64 transfer_timestamp = 1;
 
-    // The new transaction that commits to the set of Taproot Assets found
-    // at the above new anchor point.
+    // The new transaction that commits to the set of Taproot Assets found at
+    // the above new anchor point. Note that this is in raw byte format, not
+    // the reversed hex string format that is used for displayed txids. When
+    // listing assets on the CLI we purposefully use the display format so it
+    // is easier to copy and paste into other tools.
     bytes anchor_tx_hash = 2;
 
+    // The height hint of the anchor transaction. This is the height at which
+    // the anchor transaction was published, so the actual inclusion height
+    // will be greater than this value.
     uint32 anchor_tx_height_hint = 3;
 
+    // The total fees paid by the anchor transaction in satoshis.
     int64 anchor_tx_chain_fees = 4;
 
     // Describes the set of spent assets.
@@ -809,19 +860,37 @@ message TransferOutputAnchor {
     // chain.
     string outpoint = 1;
 
+    // The anchor transaction output's value in satoshis.
     int64 value = 2;
 
+    // The anchor transaction output's internal key, which is the Taproot
+    // internal key of the on-chain output.
     bytes internal_key = 3;
 
+    // The Taproot Asset root commitment hash, which is the root of the
+    // Taproot Asset commitment tree for the asset that was created.
     bytes taproot_asset_root = 4;
 
+    // The Taproot merkle root hash committed to by the outpoint of this
+    // output. If there is no Tapscript sibling, this is equal to the Taproot
+    // Asset root commitment hash.
+    // If there is a Tapscript sibling, this is the tap branch root hash of the
+    // Taproot Asset root hash and the tapscript sibling.
     bytes merkle_root = 5;
 
+    // The serialized preimage of a Tapscript sibling, if there was one. If this
+    // is empty, then the merkle_root hash is equal to the Taproot root hash
+    // of the anchor output.
     bytes tapscript_sibling = 6;
 
+    // The number of passive assets that were committed to this output.
+    // Passive assets are assets that are not actively spent, but are instead
+    // passively carried along with the main asset and re-anchored in the
+    // anchor output.
     uint32 num_passive_assets = 7;
 
-    // pk_script is the pkscript of the anchor output.
+    // The actual output's script, which is the P2TR script for the final
+    // Taproot output key created by this transfer output.
     bytes pk_script = 8;
 }
 
@@ -859,32 +928,65 @@ enum ProofDeliveryStatus {
 }
 
 message TransferOutput {
+    // The transfer output's on-chain anchor information, which contains the
+    // BTC-level output information that anchors the Taproot Asset commitment
+    // for this output.
     TransferOutputAnchor anchor = 1;
 
+    // The script key of the asset that was created.
     bytes script_key = 2;
 
+    // Indicates whether the script key is known to the wallet of the lnd node
+    // connected to the Taproot Asset daemon. If true, the asset will be shown
+    // in the wallet balance.
     bool script_key_is_local = 3;
 
+    // The amount of the asset that was created in this output.
     uint64 amount = 4;
 
     // The new individual transition proof (not a full proof file) that proves
     // the inclusion of the new asset within the new AnchorTx.
     bytes new_proof_blob = 5;
 
+    // The split commitment root hash of the asset that was created in this
+    // output. This is only set if the asset is a split root output, meaning
+    // that the asset is a split root output that carries the change from a
+    // split or a tombstone from a non-interactive full value send output.
     bytes split_commit_root_hash = 6;
 
+    // The type of the output. This is used to distinguish between a simple
+    // output that is not a split root and does not carry passive assets, and a
+    // split root output that carries the change from a split or a tombstone
+    // from a non-interactive full value send output.
     OutputType output_type = 7;
 
+    // The asset version of the output. This is used to determine how the asset
+    // is encoded in the Taproot Asset commitment tree.
     AssetVersion asset_version = 8;
 
+    // The lock time of the output, which is an optional field that can be set
+    // to delay the spending of the output until a certain time in the future.
     uint64 lock_time = 9;
 
+    // The relative lock time of the output, which is an optional field that
+    // can be set to delay the spending of the output relative to the block
+    // height at which the output is confirmed.
     uint64 relative_lock_time = 10;
 
     // The delivery status of the proof associated with this output.
     ProofDeliveryStatus proof_delivery_status = 11;
 
+    // The asset ID of the asset that was created in this output.
     bytes asset_id = 12;
+
+    // The proof courier address that was used to deliver the proof for this
+    // output.
+    string proof_courier_addr = 13;
+
+    // The Taproot Asset address that was used to create the output. This is
+    // only set for new outputs for tapd versions that support the address V2
+    // format. For older versions, this field will be empty.
+    string tap_addr = 14;
 }
 
 message StopRequest {
@@ -897,9 +999,16 @@ message DebugLevelRequest {
     // If true, all the valid debug sub-systems will be returned.
     bool show = 1;
 
+    // If set, the debug level for the sub-system will be set to this value.
+    // Can be one of: "trace", "debug", "info", "warn", "error", "critical",
+    // "off", to set a global level, optionally followed by a comma-separated
+    // list of sub-systems to set the level for. For example:
+    // "debug,TADB=info,UNIV=warn".
     string level_spec = 2;
 }
 message DebugLevelResponse {
+    // The list of available logging sub-systems that can be set to a specific
+    // debug level.
     string sub_systems = 1;
 }
 
@@ -914,22 +1023,33 @@ enum AddrVersion {
     // ADDR_VERSION_V1 is the address version that uses V2 Taproot Asset
     // commitments.
     ADDR_VERSION_V1 = 2;
+
+    // ADDR_VERSION_V2 is the address version that supports sending grouped
+    // assets and require the new auth mailbox proof courier address format.
+    ADDR_VERSION_V2 = 3;
 }
 
 message Addr {
     // The bech32 encoded Taproot Asset address.
     string encoded = 1;
 
-    // The asset ID that uniquely identifies the asset.
+    // The asset ID that uniquely identifies the asset. This can be all zeroes
+    // for V2 addresses that have a group key set.
     bytes asset_id = 2;
 
     // The type of the asset.
     AssetType asset_type = 3;
 
-    // The total amount of the asset stored in this Taproot Asset UTXO.
+    // The total amount of the asset stored in this Taproot Asset UTXO. The
+    // amount is allowed to be unset for V2 addresses, where the sender will
+    // post a fragment containing the asset IDs and amounts to the proof
+    // courier's auth mailbox.
     uint64 amount = 4;
 
-    // The group key of the asset (if it exists)
+    // The group key of the asset group to receive assets for. If this field
+    // is set, then any asset of the group can be sent to this address. Can only
+    // be specified for V2 addresses. If this field is set, the asset_id
+    // field must be empty.
     bytes group_key = 5;
 
     /*
@@ -956,7 +1076,9 @@ message Addr {
     */
     bytes taproot_output_key = 9;
 
-    // The address of the proof courier service used in proof transfer.
+    // The address of the proof courier service used in proof transfer. For V2
+    // addresses the proof courier address is mandatory and must be a valid auth
+    // mailbox address (authmailbox+universerpc://host:port).
     string proof_courier_addr = 10;
 
     // The asset version of the address.
@@ -987,12 +1109,23 @@ message QueryAddrRequest {
 }
 
 message QueryAddrResponse {
+    // The list of addresses that match the query parameters.
     repeated Addr addrs = 1;
 }
 
 message NewAddrRequest {
+    /*
+    The asset ID to create the address for. This is required for V0 and V1
+    addresses. For V2 addresses, this field is optional and must be empty if the
+    group key is set.
+    */
     bytes asset_id = 1;
 
+    /*
+    The number of asset units to be sent to the address. This is required for V0
+    and V1 addresses. For V2 addresses, this field is optional and can be left
+    at 0 to indicate that the sender can choose the amount of assets to send.
+    */
     uint64 amt = 2;
 
     /*
@@ -1038,13 +1171,26 @@ message NewAddrRequest {
     The version of this address.
     */
     AddrVersion address_version = 8;
+
+    /*
+    The group key to receive assets for. This can only be specified for V2
+    addresses. If this field is set, the asset_id field must be empty.
+    */
+    bytes group_key = 9;
+
+    /*
+    If set, the daemon skips the connectivity check to the proof courier service
+    when creating an address. Connection checks currently apply only to certain
+    address schemes. Use this to create addresses while offline.
+    */
+    bool skip_proof_courier_conn_check = 10;
 }
 
 enum ScriptKeyType {
     /*
     The type of script key is not known. This should only be stored for assets
-        where we don't know the internal key of the script key (e.g. for
-        imported proofs).
+    where we don't know the internal key of the script key (e.g. for imported
+    proofs).
     */
     SCRIPT_KEY_UNKNOWN = 0;
 
@@ -1085,6 +1231,17 @@ enum ScriptKeyType {
     selection.
     */
     SCRIPT_KEY_CHANNEL = 5;
+
+    /*
+    The script key is derived using the asset ID and a single leaf that contains
+    an un-spendable Pedersen commitment key
+    `(OP_CHECKSIG <NUMS_key + asset_id * G>)`. This can be used to create
+    unique script keys for each virtual packet in the fragment, to avoid proof
+    collisions in the universe, where the script keys should be spendable by
+    a hardware wallet that only supports miniscript policies for signing P2TR
+    outputs.
+    */
+    SCRIPT_KEY_UNIQUE_PEDERSEN = 6;
 }
 
 message ScriptKeyTypeQuery {
@@ -1174,6 +1331,7 @@ message TapBranch {
 }
 
 message DecodeAddrRequest {
+    // The bech32 encoded Taproot Asset address to decode.
     string addr = 1;
 }
 
@@ -1182,6 +1340,8 @@ message ProofFile {
     // individual mint/transfer proof.
     bytes raw_proof_file = 1;
 
+    // The genesis point of the proof file, which is the asset's genesis
+    // transaction outpoint.
     string genesis_point = 2;
 }
 
@@ -1250,6 +1410,7 @@ message DecodedProof {
 }
 
 message VerifyProofResponse {
+    // Whether the proof file was valid or not.
     bool valid = 1;
 
     // The decoded last proof in the file if the proof file was valid.
@@ -1276,12 +1437,18 @@ message DecodeProofRequest {
 }
 
 message DecodeProofResponse {
+    // The decoded, more human-readable proof.
     DecodedProof decoded_proof = 1;
 }
 
 message ExportProofRequest {
+    // The asset ID of the asset to export the proof for.
     bytes asset_id = 1;
+
+    // The script key of the asset to export the proof for.
     bytes script_key = 2;
+
+    // The on-chain outpoint of the asset to export the proof for.
     OutPoint outpoint = 3;
 
     // TODO(roasbeef): specify information to make new state transition in proof
@@ -1353,6 +1520,14 @@ message AddrReceivesRequest {
 
     // Filter receives by a specific status. Leave empty to get all receives.
     AddrEventStatus filter_status = 2;
+
+    // Filter receives by creation time greater than or equal to this timestamp.
+    // If not set, no start time filtering is applied.
+    uint64 start_timestamp = 3;
+
+    // Filter receives by creation time less than or equal to this timestamp.
+    // If not set, no end time filtering is applied.
+    uint64 end_timestamp = 4;
 }
 
 message AddrReceivesResponse {
@@ -1361,12 +1536,17 @@ message AddrReceivesResponse {
 }
 
 message SendAssetRequest {
+    // The list of TAP addresses to send assets to. The amount to send to each
+    // address is determined by the amount specified in the address itself. For
+    // V2 addresses that are allowed to not specify an amount, use the
+    // addresses_with_amounts list to specify the amount to send to each
+    // address. The tap_addrs and addresses_with_amounts lists are mutually
+    // exclusive, meaning that if addresses_with_amounts is set, then tap_addrs
+    // must be empty, and vice versa.
     repeated string tap_addrs = 1;
 
     // The optional fee rate to use for the minting transaction, in sat/kw.
     uint32 fee_rate = 2;
-    // TODO(roasbeef): maybe in future add details re type of ProofCourier or
-    // w/e
 
     // An optional short label for the send transfer. This label can be used to
     // track the progress of the transfer via the logs or an event subscription.
@@ -1377,16 +1557,45 @@ message SendAssetRequest {
     // testing purposes and for forced transfers when the proof courier
     // is not immediately available.
     bool skip_proof_courier_ping_check = 4;
+
+    // A list of addresses and the amounts of asset units to send to them. This
+    // must be used for V2 TAP addresses that don't specify an amount in the
+    // address itself and allow the sender to choose the amount to send. The
+    // tap_addrs and addresses_with_amounts lists are mutually exclusive,
+    // meaning that if addresses_with_amounts is set, then tap_addrs must be
+    // empty, and vice versa.
+    repeated AddressWithAmount addresses_with_amounts = 5;
+}
+
+message AddressWithAmount {
+    // The TAP address to send assets to.
+    string tap_addr = 1;
+
+    // The amount of asset units to send to the address. This is only used for
+    // re-usable V2 addresses that don't specify an amount in the address itself
+    // and allow the sender to specify the amount on each send attempt. For V0
+    // or V1 addresses, this can be left empty (zero) as the amount is taken
+    // from the address itself.
+    uint64 amount = 2;
 }
 
 message PrevInputAsset {
+    // The previous input's anchor point, which is the on-chain outpoint the
+    // asset was anchored to.
     string anchor_point = 1;
+
+    // The asset ID of the asset that was spent as an input.
     bytes asset_id = 2;
+
+    // The script key of the asset that was spent as an input.
     bytes script_key = 3;
+
+    // The amount of the asset that was spent as an input.
     uint64 amount = 4;
 }
 
 message SendAssetResponse {
+    // The transfer that was created to send assets to one or more addresses.
     AssetTransfer transfer = 1;
 }
 
@@ -1394,13 +1603,32 @@ message GetInfoRequest {
 }
 
 message GetInfoResponse {
+    // The full version string of the Taproot Asset daemon.
     string version = 1;
+
+    // The full version string of the LND node that this daemon is connected to.
     string lnd_version = 2;
+
+    // The network this daemon is connected to, e.g. "mainnet", "testnet", or
+    // any other supported network.
     string network = 3;
+
+    // The public key of the LND node that this daemon is connected to.
     string lnd_identity_pubkey = 4;
+
+    // The alias of the LND node that this daemon is connected to.
     string node_alias = 5;
+
+    // The current block height as seen by the LND node this daemon is
+    // connected to.
     uint32 block_height = 6;
+
+    // The current block hash as seen by the LND node this daemon is connected
+    // to.
     string block_hash = 7;
+
+    // Whether the LND node this daemon is connected to is synced to the
+    // Bitcoin chain.
     bool sync_to_chain = 8;
 }
 
@@ -1420,6 +1648,54 @@ message FetchAssetMetaRequest {
     }
 }
 
+message FetchAssetMetaResponse {
+    /*
+    The raw data of the asset meta data. Based on the type below, this may be
+    structured data such as a text file or PDF. The size of the data is limited
+    to 1MiB.
+    */
+    bytes data = 1;
+
+    // The type of the asset meta data.
+    AssetMetaType type = 2;
+
+    /*
+    The hash of the meta. This is the hash of the TLV serialization of the meta
+    itself.
+    */
+    bytes meta_hash = 3;
+
+    /*
+    A map of unknown odd TLV types that were encountered during asset meta data
+    decoding.
+    */
+    map<uint64, bytes> unknown_odd_types = 4;
+
+    /*
+    The decimal display value of the asset. This is used to determine the number
+    of decimal places to display when presenting the asset amount to the user.
+    */
+    uint32 decimal_display = 5;
+
+    /*
+    Boolean flag indicating whether the asset-group issuer publishes
+    universe-supply commitments to the canonical universe set.
+    */
+    bool universe_commitments = 6;
+
+    /*
+    List of canonical universe URLs where the asset-group issuer publishes
+    asset-related proofs.
+    */
+    repeated string canonical_universe_urls = 7;
+
+    /*
+    The public key that is used to verify universe supply commitment related
+    on-chain outputs and proofs.
+    */
+    bytes delegation_key = 8;
+}
+
 message BurnAssetRequest {
     oneof asset {
         // The asset ID of the asset to burn units of.
@@ -1429,6 +1705,7 @@ message BurnAssetRequest {
         string asset_id_str = 2;
     }
 
+    // The number of asset units to burn. This must be greater than zero.
     uint64 amount_to_burn = 3;
 
     // A safety check to ensure the user is aware of the destructive nature of
@@ -1477,19 +1754,8 @@ message AssetBurn {
 }
 
 message ListBurnsResponse {
+    // The list of asset burns that match the query parameters.
     repeated AssetBurn burns = 1;
-}
-
-message OutPoint {
-    /*
-    Raw bytes representing the transaction id.
-    */
-    bytes txid = 1;
-
-    /*
-    The index of the output on the transaction.
-    */
-    uint32 output_index = 2;
 }
 
 message SubscribeReceiveEventsRequest {
@@ -1533,6 +1799,10 @@ message SubscribeSendEventsRequest {
     // Filter send events by a specific label. Leave empty to not filter by
     // transfer label.
     string filter_label = 2;
+
+    // The start time as a Unix timestamp in microseconds. If not set (default
+    // value 0), the daemon will start streaming events from the current time.
+    int64 start_timestamp = 3;
 }
 
 enum SendState {
@@ -1636,6 +1906,8 @@ message SendEvent {
 }
 
 message AnchorTransaction {
+    // The on-chain anchor transaction PSBT packet that was created by the
+    // daemon.
     bytes anchor_psbt = 1;
 
     /*
@@ -1682,5 +1954,6 @@ message RegisterTransferRequest {
 }
 
 message RegisterTransferResponse {
+    // The asset transfer that was registered.
     Asset registered_asset = 1;
 }
