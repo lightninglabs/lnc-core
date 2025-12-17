@@ -166,19 +166,16 @@ export interface MintAsset {
      */
     externalGroupKey: ExternalKey | undefined;
     /**
-     * Enabling this flag allows the creation of universe commitments for a new
-     * asset group.
+     * Enables the supply commitments feature for a new asset group.
      *
-     * Universe commitments are minter-controlled, on-chain attestations that
-     * anchor and verify the state of an asset group.
+     * Supply commitments are minter‑controlled, on‑chain attestations that
+     * anchor and verify the evolving aggregate supply state of an asset group.
      *
-     * This flag imposes restrictions on the minting process by limiting the batch
-     * to assets within the same universe, meaning they share the same group key.
-     * This option is applicable only for the creation of a new asset group
-     * (i.e., the first minting tranche of an asset group) and ensures that the
-     * batch is limited to a single asset group.
+     * When enabled, the batch must be a single asset group (all assets share the
+     * same group key). Valid only for creating a new asset group (the first
+     * minting tranche).
      */
-    universeCommitments: boolean;
+    enableSupplyCommitments: boolean;
 }
 
 export interface MintAssetRequest {

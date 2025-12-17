@@ -74,7 +74,9 @@ protoc/bin/protoc \
   signrpc/signer.proto \
   walletrpc/walletkit.proto \
   watchtowerrpc/watchtower.proto \
-  wtclientrpc/wtclient.proto
+  wtclientrpc/wtclient.proto \
+  peersrpc/peers.proto \
+  stateservice.proto
 
 
 echo "LOOP: running protoc..."
@@ -116,6 +118,7 @@ protoc/bin/protoc \
   --plugin=./node_modules/.bin/protoc-gen-ts_proto \
   --ts_proto_out=$GENERATED_TYPES_DIR/tapd \
   $TS_PROTO_OPTIONS \
+  tapcommon.proto \
   taprootassets.proto \
   assetwalletrpc/assetwallet.proto \
   mintrpc/mint.proto \
@@ -123,7 +126,8 @@ protoc/bin/protoc \
   rfqrpc/rfq.proto \
   tapchannelrpc/tapchannel.proto \
   tapdevrpc/tapdev.proto \
-  universerpc/universe.proto
+  universerpc/universe.proto \
+  authmailboxrpc/mailbox.proto
 
 echo "LiT: running protoc..."
 mkdir -p "$GENERATED_TYPES_DIR/lit"
@@ -169,7 +173,9 @@ protoc/bin/protoc \
   signrpc/signer.proto \
   walletrpc/walletkit.proto \
   watchtowerrpc/watchtower.proto \
-  wtclientrpc/wtclient.proto
+  wtclientrpc/wtclient.proto \
+  peersrpc/peers.proto \
+  stateservice.proto
 
 echo "LOOP: generating schema..."
 mkdir -p "$SCHEMA_DIR/loop"
@@ -210,6 +216,7 @@ protoc/bin/protoc \
   --plugin=./node_modules/.bin/protoc-gen-ts_proto \
   --ts_proto_out=$SCHEMA_DIR/tapd \
   $SCHEMA_PROTO_OPTIONS \
+  tapcommon.proto \
   taprootassets.proto \
   assetwalletrpc/assetwallet.proto \
   mintrpc/mint.proto \
@@ -217,7 +224,8 @@ protoc/bin/protoc \
   rfqrpc/rfq.proto \
   tapchannelrpc/tapchannel.proto \
   tapdevrpc/tapdev.proto \
-  universerpc/universe.proto
+  universerpc/universe.proto \
+  authmailboxrpc/mailbox.proto
 
 echo "LIT: generating schema..."
 mkdir -p "$SCHEMA_DIR/lit"

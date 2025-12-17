@@ -268,6 +268,10 @@ export enum StaticAddressLoopInSwapState {
     UNRECOGNIZED = 'UNRECOGNIZED'
 }
 
+export interface StopDaemonRequest {}
+
+export interface StopDaemonResponse {}
+
 export interface LoopOutRequest {
     /** Requested swap amount in sat. This does not include the swap and miner fee. */
     amt: string;
@@ -622,7 +626,12 @@ export interface OutTermsResponse {
 }
 
 export interface QuoteRequest {
-    /** The amount to swap in satoshis. */
+    /**
+     * The amount to swap in satoshis. In the loop-in case this can either be taken
+     * from the connected lnd wallet or coin-selected from static address deposits.
+     * This is controlled by the select_deposits flag. If deposit_outpoints are
+     * specified, the coins are taken out of that.
+     */
     amt: string;
     /**
      * The confirmation target that should be used either for the sweep of the
@@ -660,8 +669,9 @@ export interface QuoteRequest {
     private: boolean;
     /**
      * Static address deposit outpoints that will be quoted for. This option only
-     * pertains to loop in swaps. Either this or the amt parameter can be set at
-     * the same time.
+     * pertains to loop in swaps. If the amt field is set as well the respective
+     * partial amount will be swapped. Cannot be used in conjunction with
+     * auto_select_deposits.
      */
     depositOutpoints: string[];
     /**
@@ -669,6 +679,19 @@ export interface QuoteRequest {
      * be returned in the specified asset.
      */
     assetInfo: AssetLoopOutRequest | undefined;
+    /**
+     * In the legacy loop-in case this field must be set to false.
+     * If set to true, the swap amount will be automatically selected from the
+     * static address deposits. If set to true, deposit_outpoints must be empty.
+     * This option only pertains to loop in swaps.
+     */
+    autoSelectDeposits: boolean;
+    /**
+     * If set to true the server will immediately publish the swap in exchange for
+     * a higher fee. This can be useful if the client expects change from a swap.
+     * Note that this feature is only available for static address loop in swaps.
+     */
+    fast: boolean;
 }
 
 export interface InQuoteResponse {
@@ -687,6 +710,12 @@ export interface InQuoteResponse {
     cltvDelta: number;
     /** The confirmation target to be used to publish the on-chain HTLC. */
     confTarget: number;
+    /**
+     * If the quote request was for a static address loop in and only contained
+     * deposit outpoints the quote response will return the total amount of the
+     * selected deposits.
+     */
+    quotedAmt: string;
 }
 
 export interface OutQuoteResponse {
@@ -947,6 +976,12 @@ export interface LiquidityParameters {
      * not be able to be batched with other swaps.
      */
     fastSwapPublication: boolean;
+    /**
+     * A list of peers (their public keys) that should be excluded from the easy
+     * autoloop run. If set, channels connected to these peers won't be
+     * considered for easy autoloop swaps.
+     */
+    easyAutoloopExcludedPeers: Uint8Array | string[];
 }
 
 export interface LiquidityParameters_EasyAssetParamsEntry {
@@ -1282,6 +1317,11 @@ export interface Deposit {
      * loop-in swap anymore.
      */
     blocksUntilExpiry: string;
+    /**
+     * The swap hash of the swap that this deposit is part of. This field is only
+     * set if the deposit is part of a loop-in swap.
+     */
+    swapHash: Uint8Array | string;
 }
 
 export interface StaticAddressWithdrawal {
@@ -1320,6 +1360,8 @@ export interface StaticAddressLoopInSwap {
      * fees.
      */
     paymentRequestAmountSatoshis: string;
+    /** The deposits that were used for this swap. */
+    deposits: Deposit[];
 }
 
 export interface StaticAddressLoopInRequest {
@@ -1366,6 +1408,22 @@ export interface StaticAddressLoopInRequest {
      * side and the client can retry the swap with different parameters.
      */
     paymentTimeoutSeconds: number;
+    /**
+     * The optional swap amount the client is attempting to swap. It can be
+     * provided in combination with the outpoints or separately. If provided with
+     * outpoints the client takes out this amount from the sum of provided
+     * outpoints and sends the change back to the static address. If the amount is
+     * provided without outpoints, the client will select deposits automatically.
+     * The coin selection strategy is simplified by sorting all available deposits
+     * in descending order by amount, and equal amounts in ascending order of
+     * blocks until expiry, and then selecting the largest deposits first until the
+     * amount is reached. The change will be sent back to the static address. If a
+     * subset of outpoints suffice to cover the specified amount the swap will be
+     * canceled to allow the user to safe on transaction fees.
+     */
+    amount: string;
+    /** If set, request the server to use fast publication behavior. */
+    fast: boolean;
 }
 
 export interface StaticAddressLoopInResponse {
@@ -1402,6 +1460,20 @@ export interface StaticAddressLoopInResponse {
      * side and the client can retry the swap with different parameters.
      */
     paymentTimeoutSeconds: number;
+    /** The deposits that are used for this swap. */
+    usedDeposits: Deposit[];
+    /**
+     * The amount that is being swapped (may be less than total deposit value if
+     * change is returned).
+     */
+    swapAmount: string;
+    /** The change amount that will be returned to the static address. */
+    change: string;
+    /**
+     * If set, indicates that the server was requested to use fast publication
+     * behavior.
+     */
+    fast: boolean;
 }
 
 export interface AssetLoopOutRequest {
@@ -1610,6 +1682,13 @@ export interface SwapClient {
      * GetInfo gets basic information about the loop daemon.
      */
     getInfo(request?: DeepPartial<GetInfoRequest>): Promise<GetInfoResponse>;
+    /**
+     * loop: `stop`
+     * StopDaemon instructs the daemon to shut down gracefully.
+     */
+    stopDaemon(
+        request?: DeepPartial<StopDaemonRequest>
+    ): Promise<StopDaemonResponse>;
     /**
      * loop: `getparams`
      * GetLiquidityParams gets the parameters that the daemon's liquidity manager

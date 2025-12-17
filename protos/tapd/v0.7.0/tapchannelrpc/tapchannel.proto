@@ -17,6 +17,7 @@ service TaprootAssetChannels {
     rpc FundChannel (FundChannelRequest) returns (FundChannelResponse);
 
     /*
+    Deprecated.
     EncodeCustomRecords allows RPC users to encode Taproot Asset channel related
     data into the TLV format that is used in the custom records of the lnd
     payment or other channel related RPCs. This RPC is completely stateless and
@@ -24,7 +25,9 @@ service TaprootAssetChannels {
     validation.
     */
     rpc EncodeCustomRecords (EncodeCustomRecordsRequest)
-        returns (EncodeCustomRecordsResponse);
+        returns (EncodeCustomRecordsResponse) {
+        option deprecated = true;
+    };
 
     /* litcli: `ln sendpayment`
     SendPayment is a wrapper around lnd's routerrpc.SendPaymentV2 RPC method
@@ -100,6 +103,7 @@ message RouterSendPaymentData {
 
 message EncodeCustomRecordsRequest {
     oneof input {
+        // The custom records to encode for a payment request.
         RouterSendPaymentData router_send_payment = 1;
     }
 }
@@ -124,8 +128,8 @@ message SendPaymentRequest {
     uint64 asset_amount = 2;
 
     // The node identity public key of the peer to ask for a quote for sending
-    // out the assets and converting them to satoshis. This must be specified if
-    // there are multiple channels with the given asset ID.
+    // out the assets and converting them to satoshis. If set, only a quote with
+    // this peer may be negotiated to carry out the payment.
     bytes peer_pubkey = 3;
 
     // The full lnd payment request to send. All fields behave the same way as
@@ -153,6 +157,23 @@ message SendPaymentRequest {
     // The group key which dictates which assets may be used for this payment.
     // Mutually exclusive to asset_id.
     bytes group_key = 7;
+
+    // An optional text field that can be used to provide additional metadata
+    // about the payment to the price oracle. This can include information
+    // about the wallet end user that initiated the transaction, or any
+    // authentication information that the price oracle can use to give out a
+    // more accurate (or discount) asset rate. Though not verified or enforced
+    // by tapd, the suggested format for this field is a JSON string.
+    // This field is optional and can be left empty if no metadata is available.
+    // The maximum length of this field is 32'768 bytes.
+    string price_oracle_metadata = 8;
+}
+
+message AcceptedSellQuotes {
+    // If swapping of assets is necessary to carry out the payment, a number of
+    // RFQ quotes may be negotiated for that purpose. The following field
+    // contains all the sell orders that were negotiated with our peers.
+    repeated rfqrpc.PeerAcceptedSellQuote accepted_sell_orders = 1;
 }
 
 message SendPaymentResponse {
@@ -161,16 +182,26 @@ message SendPaymentResponse {
         // sell order is negotiated with the channel peer. The result will be
         // the first message in the response stream. If no swap is needed, the
         // payment results will be streamed directly.
+        // Deprecated. This will now only contain the first quote that was
+        // negotiated. Since the introduction of multi-rfq we now negotiate
+        // multiple quotes in the context of a payment. Use the new field named
+        // "accepted_sell_orders" to retrieve all of them.
         rfqrpc.PeerAcceptedSellQuote accepted_sell_order = 1;
 
-        // The payment result of a single payment attempt. Multiple attempts may
-        // be returned per payment request until either the payment succeeds or
-        // the payment times out.
+        // If swapping of assets is necessary to carry out the payment, a number
+        // of RFQ quotes may be negotiated for that purpose. The following field
+        // contains all the sell orders that were negotiated with our peers.
+        AcceptedSellQuotes accepted_sell_orders = 3;
+
+        // The payment result of a single payment attempt. Multiple attempts
+        // may be returned per payment request until either the payment
+        // succeeds or the payment times out.
         lnrpc.Payment payment_result = 2;
     }
 }
 
 message HodlInvoice {
+    // The payment hash of the HODL invoice to be created.
     bytes payment_hash = 1;
 }
 
@@ -210,6 +241,16 @@ message AddInvoiceRequest {
     // invoice. If set, any asset that belongs to this group may be accepted to
     // settle this invoice. Mutually exclusive to asset_id.
     bytes group_key = 6;
+
+    // An optional text field that can be used to provide additional metadata
+    // about the invoice to the price oracle. This can include information
+    // about the wallet end user that initiated the transaction, or any
+    // authentication information that the price oracle can use to give out a
+    // more accurate (or discount) asset rate. Though not verified or enforced
+    // by tapd, the suggested format for this field is a JSON string.
+    // This field is optional and can be left empty if no metadata is available.
+    // The maximum length of this field is 32'768 bytes.
+    string price_oracle_metadata = 7;
 }
 
 message AddInvoiceResponse {
@@ -232,6 +273,16 @@ message AssetPayReq {
     // The group key that will be used to resolve the invoice's satoshi amount.
     // Mutually exclusive to asset_id.
     bytes group_key = 3;
+
+    // An optional text field that can be used to provide additional metadata
+    // about the invoice to the price oracle. This can include information
+    // about the wallet end user that initiated the transaction, or any
+    // authentication information that the price oracle can use to give out a
+    // more accurate (or discount) asset rate. Though not verified or enforced
+    // by tapd, the suggested format for this field is a JSON string.
+    // This field is optional and can be left empty if no metadata is available.
+    // The maximum length of this field is 32'768 bytes.
+    string price_oracle_metadata = 4;
 }
 
 message AssetPayReqResponse {

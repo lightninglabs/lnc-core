@@ -16,8 +16,10 @@ export const serviceNames = {
     invoicesrpc: { Invoices: 'invoicesrpc.Invoices' },
     lnrpc: {
         Lightning: 'lnrpc.Lightning',
+        State: 'lnrpc.State',
         WalletUnlocker: 'lnrpc.WalletUnlocker'
     },
+    peersrpc: { Peers: 'peersrpc.Peers' },
     routerrpc: { Router: 'routerrpc.Router' },
     signrpc: { Signer: 'signrpc.Signer' },
     walletrpc: { WalletKit: 'walletrpc.WalletKit' },
@@ -30,6 +32,7 @@ export const serviceNames = {
         Trader: 'poolrpc.Trader'
     },
     assetwalletrpc: { AssetWallet: 'assetwalletrpc.AssetWallet' },
+    authmailboxrpc: { Mailbox: 'authmailboxrpc.Mailbox' },
     mintrpc: { Mint: 'mintrpc.Mint' },
     priceoraclerpc: { PriceOracle: 'priceoraclerpc.PriceOracle' },
     rfqrpc: { Rfq: 'rfqrpc.Rfq' },
@@ -73,10 +76,12 @@ export const subscriptionMethods = [
     'routerrpc.Router.SendPayment',
     'routerrpc.Router.TrackPayment',
     'routerrpc.Router.HtlcInterceptor',
+    'lnrpc.State.SubscribeState',
     'looprpc.SwapClient.Monitor',
     'poolrpc.ChannelAuctioneer.SubscribeBatchAuction',
     'poolrpc.ChannelAuctioneer.SubscribeSidecar',
     'poolrpc.HashMail.RecvStream',
+    'authmailboxrpc.Mailbox.ReceiveMessages',
     'lnrpc.Lightning.SubscribeTransactions',
     'lnrpc.Lightning.SubscribePeerEvents',
     'lnrpc.Lightning.SubscribeChannelEvents',

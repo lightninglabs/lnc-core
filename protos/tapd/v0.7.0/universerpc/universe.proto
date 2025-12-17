@@ -1,5 +1,6 @@
 syntax = "proto3";
 
+import "tapcommon.proto";
 import "taprootassets.proto";
 
 package universerpc;
@@ -82,7 +83,9 @@ service Universe {
     // TODO(roasbeef): rename resp to UniverseStateUpdate? ^
 
     /* tapcli: `universe info`
-    Info returns a set of information about the current state of the Universe.
+    Info returns a set of information about the current state of the Universe
+    and allows a caller to check that a universe server is reachable and
+    configured correctly to allow proof courier access without macaroons.
     */
     rpc Info (InfoRequest) returns (InfoResponse);
 
@@ -154,6 +157,44 @@ service Universe {
     */
     rpc QueryFederationSyncConfig (QueryFederationSyncConfigRequest)
         returns (QueryFederationSyncConfigResponse);
+
+    /* tapcli: `universe ignoreoutpoint`
+    IgnoreAssetOutPoint allows an asset issuer to mark a specific asset outpoint
+    as ignored. An ignored outpoint will be included in the next universe supply
+    commitment transaction that is published.
+    */
+    rpc IgnoreAssetOutPoint (IgnoreAssetOutPointRequest)
+        returns (IgnoreAssetOutPointResponse);
+
+    /* tapcli: `universe updatesupplycommit`
+    UpdateSupplyCommit updates the on-chain supply commitment for a specific
+    asset group.
+    */
+    rpc UpdateSupplyCommit (UpdateSupplyCommitRequest)
+        returns (UpdateSupplyCommitResponse);
+
+    /* tapcli: `universe fetchsupplycommit`
+    FetchSupplyCommit fetches the on-chain supply commitment for a specific
+    asset group.
+    */
+    rpc FetchSupplyCommit (FetchSupplyCommitRequest)
+        returns (FetchSupplyCommitResponse);
+
+    /* tapcli: `universe supplyleaves`
+    FetchSupplyLeaves fetches the supply leaves for a specific asset group
+    within a specified block height range. The leaves include issuance, burn,
+    and ignore leaves, which represent the supply changes for the asset group.
+    */
+    rpc FetchSupplyLeaves (FetchSupplyLeavesRequest)
+        returns (FetchSupplyLeavesResponse);
+
+    /* tapcli: `universe supplycommit insert`
+    InsertSupplyCommit inserts a supply commitment for a specific asset
+    group. This includes the commitment details, supply leaves (issuance, burn,
+    and ignore), and chain proof that proves the commitment has been mined.
+    */
+    rpc InsertSupplyCommit (InsertSupplyCommitRequest)
+        returns (InsertSupplyCommitResponse);
 }
 
 message MultiverseRootRequest {
@@ -228,6 +269,7 @@ message ID {
 }
 
 message UniverseRoot {
+    // The ID of the asset universe root.
     ID id = 1;
 
     // The merkle sum sparse merkle tree root associated with the above
@@ -428,6 +470,7 @@ enum UniverseSyncMode {
 }
 
 message SyncTarget {
+    // The ID of the asset to sync.
     ID id = 1;
 }
 
@@ -464,7 +507,12 @@ message SyncResponse {
 }
 
 message UniverseFederationServer {
+    // The host of the federation server, which is used to connect to the
+    // server to push proofs and sync new proofs.
     string host = 1;
+
+    // The numeric ID of the federation server. This is used to identify
+    // existing servers when adding or deleting them from the federation.
     int32 id = 2;
 }
 
@@ -472,10 +520,13 @@ message ListFederationServersRequest {
 }
 
 message ListFederationServersResponse {
+    // The list of federation servers that make up the local Universe
+    // federation.
     repeated UniverseFederationServer servers = 1;
 }
 
 message AddFederationServerRequest {
+    // The federation server to add to the local Universe federation.
     repeated UniverseFederationServer servers = 1;
 }
 
@@ -483,6 +534,7 @@ message AddFederationServerResponse {
 }
 
 message DeleteFederationServerRequest {
+    // The federation server to delete from the local Universe federation.
     repeated UniverseFederationServer servers = 1;
 }
 
@@ -529,18 +581,31 @@ enum AssetTypeFilter {
 }
 
 message AssetStatsQuery {
+    // The asset name filter. If this is empty, then all assets are returned.
     string asset_name_filter = 1;
 
+    // The asset ID filter. If this is empty, then all assets are returned.
     bytes asset_id_filter = 2;
 
+    // The asset type filter. If this is set to FILTER_ASSET_NONE, then all
+    // assets are returned. If set to FILTER_ASSET_NORMAL, then only normal
+    // assets are returned. If set to FILTER_ASSET_COLLECTIBLE, then only
+    // collectible assets are returned.
     AssetTypeFilter asset_type_filter = 3;
 
+    // The sort order for the query. If this is set to SORT_BY_NONE, then the
+    // results are not sorted.
     AssetQuerySort sort_by = 4;
 
+    // The offset for the page. This is used for pagination.
     int32 offset = 5;
 
+    // The length limit for the page. This is used for pagination.
     int32 limit = 6;
 
+    // The direction of the sort. If this is set to SORT_DIRECTION_ASC, then
+    // the results are sorted in ascending order. If set to
+    // SORT_DIRECTION_DESC, then the results are sorted in descending order.
     SortDirection direction = 7;
 }
 
@@ -571,48 +636,76 @@ message AssetStatsSnapshot {
 }
 
 message AssetStatsAsset {
+    // The ID of the asset.
     bytes asset_id = 1;
 
+    // The asset's genesis point, which is the outpoint of the genesis
+    // transaction that created the asset. This is a hex encoded string.
     string genesis_point = 2;
 
+    // The total supply of the asset. This is the total number of units of the
+    // asset that have been issued.
     int64 total_supply = 3;
 
+    // The human-readable name of the asset.
     string asset_name = 4;
 
+    // The type of the asset. This can be either a normal asset or a collectible
+    // asset.
     taprpc.AssetType asset_type = 5;
 
+    // The height of the block at which the asset was created.
     int32 genesis_height = 6;
 
+    // The timestamp of the block at which the asset was created, in Unix epoch
+    // time (seconds).
     int64 genesis_timestamp = 7;
 
+    // The anchor point of the asset, which is a human-readable string that
+    // represents the asset's anchor point in the blockchain.
     string anchor_point = 8;
 
+    // The decimal display value for the asset. This is the number of decimal
+    // places that the asset can be divided into.
     uint32 decimal_display = 9;
 }
 
 message UniverseAssetStats {
+    // The asset statistics snapshot for the queried assets.
     repeated AssetStatsSnapshot asset_stats = 1;
 }
 
 message QueryEventsRequest {
+    // The start timestamp for the query, in Unix epoch time (seconds).
     int64 start_timestamp = 1;
+
+    // The end timestamp for the query, in Unix epoch time (seconds).
     int64 end_timestamp = 2;
 }
 
 message QueryEventsResponse {
+    // The list of grouped universe events that occurred within the specified
+    // time range. Each entry in the list represents a day, with the number of
+    // sync and new proof events that occurred on that day.
     repeated GroupedUniverseEvents events = 1;
 }
 
 message GroupedUniverseEvents {
     // The date the events occurred on, formatted as YYYY-MM-DD.
     string date = 1;
+
+    // The number of sync events that occurred on this date.
     uint64 sync_events = 2;
+
+    // The number of new proof events that occurred on this date.
     uint64 new_proof_events = 3;
 }
 
 message SetFederationSyncConfigRequest {
+    // The global federation sync configs for the given proof types.
     repeated GlobalFederationSyncConfig global_sync_configs = 1;
 
+    // The asset federation sync configs for the given universe IDs.
     repeated AssetFederationSyncConfig asset_sync_configs = 2;
 }
 
@@ -659,7 +752,312 @@ message QueryFederationSyncConfigRequest {
 }
 
 message QueryFederationSyncConfigResponse {
+    // The global federation sync configs for the given proof types.
     repeated GlobalFederationSyncConfig global_sync_configs = 1;
 
+    // The asset federation sync configs for the given universe IDs.
     repeated AssetFederationSyncConfig asset_sync_configs = 2;
+}
+
+message IgnoreAssetOutPointRequest {
+    // The outpoint of the asset to ignore.
+    taprpc.AssetOutPoint asset_out_point = 1;
+
+    // The amount of asset units at the associated asset outpoint.
+    uint64 amount = 2;
+}
+
+message IgnoreAssetOutPointResponse {
+    // The key identifying the signed ignore outpoint leaf in the ignore supply
+    // commitment subtree.
+    bytes leaf_key = 1;
+
+    // The signed ignore outpoint leaf in the ignore supply commitment tree.
+    MerkleSumNode leaf = 2;
+}
+
+message UpdateSupplyCommitRequest {
+    // The unique identifier for the target asset group whose supply commitment
+    // is being updated.
+    oneof group_key {
+        // The 32-byte asset group key specified as raw bytes (gRPC only).
+        bytes group_key_bytes = 1;
+
+        // The 32-byte asset group key encoded as hex string (use this for
+        // REST).
+        string group_key_str = 2;
+    }
+}
+
+message UpdateSupplyCommitResponse {
+}
+
+message FetchSupplyCommitRequest {
+    // The unique identifier for the target asset group whose supply commitment
+    // is being fetched.
+    oneof group_key {
+        // The 32-byte asset group key specified as raw bytes (gRPC only).
+        bytes group_key_bytes = 1;
+
+        // The 32-byte asset group key encoded as hex string (use this for
+        // REST).
+        string group_key_str = 2;
+    }
+
+    // Specifies which supply commit to fetch.
+    oneof locator {
+        // Fetch the the supply commitment that created this new commitment
+        // output on chain.
+        taprpc.OutPoint commit_outpoint = 3;
+
+        // Fetch the supply commitment that spent the specified commitment
+        // output on chain to create a new supply commitment. This can be used
+        // to traverse the chain of supply commitments by watching the spend of
+        // the commitment output.
+        taprpc.OutPoint spent_commit_outpoint = 4;
+
+        // Fetch the very first supply commitment for the asset group. This
+        // returns the initial supply commitment that spent the pre-commitment
+        // output of the very first asset mint of a grouped asset (also known
+        // as the group anchor). This is useful as the starting point to fetch
+        // all supply commitments for a grouped asset one by one.
+        bool very_first = 5;
+
+        // Fetch the latest supply commitment for the asset group. This returns
+        // the most recent supply commitment that is anchored on chain for the
+        // asset group. This is useful to always get the current supply state
+        // of the asset group.
+        bool latest = 6;
+    }
+}
+
+message SupplyCommitSubtreeRoot {
+    // The type of the supply commit subtree.
+    string type = 1;
+
+    // The root node of the supply commit subtree.
+    MerkleSumNode root_node = 2;
+
+    // The leaf key which locates the subtree leaf node in the supply commit
+    // tree.
+    bytes supply_tree_leaf_key = 3;
+
+    // The inclusion proof for the supply commit subtree root node.
+    bytes supply_tree_inclusion_proof = 4;
+}
+
+message FetchSupplyCommitResponse {
+    // The supply commitment chain data that contains both the commitment and
+    // chain proof information.
+    SupplyCommitChainData chain_data = 1;
+
+    // The total number of satoshis in on-chain fees paid by the supply
+    // commitment transaction.
+    int64 tx_chain_fees_sats = 2;
+
+    // The root of the issuance tree for the specified asset.
+    SupplyCommitSubtreeRoot issuance_subtree_root = 3;
+
+    // The root of the burn tree for the specified asset.
+    SupplyCommitSubtreeRoot burn_subtree_root = 4;
+
+    // The root of the ignore tree for the specified asset.
+    SupplyCommitSubtreeRoot ignore_subtree_root = 5;
+
+    // The issuance leaves that were added by this supply commitment. Does not
+    // include leaves that were already present in the issuance subtree before
+    // the block height at which this supply commitment was anchored.
+    repeated SupplyLeafEntry issuance_leaves = 6;
+
+    // The burn leaves that were added by this supply commitment. Does not
+    // include leaves that were already present in the burn subtree before
+    // the block height at which this supply commitment was anchored.
+    repeated SupplyLeafEntry burn_leaves = 7;
+
+    // The ignore leaves that were added by this supply commitment. Does not
+    // include leaves that were already present in the ignore subtree before
+    // the block height at which this supply commitment was anchored.
+    repeated SupplyLeafEntry ignore_leaves = 8;
+
+    // The total outstanding supply of the asset after applying all the supply
+    // changes (issuance, burn, ignore) included in this supply commitment.
+    uint64 total_outstanding_supply = 9;
+
+    // The outpoint of the previous commitment that this new commitment is
+    // spending. This must be set unless this is the very first supply
+    // commitment of a grouped asset.
+    taprpc.OutPoint spent_commitment_outpoint = 10;
+
+    // A map of block height to supply leaf block header for all block heights
+    // referenced in supply leaves.
+    map<uint32, SupplyLeafBlockHeader> block_headers = 11;
+}
+
+message FetchSupplyLeavesRequest {
+    // The unique identifier for the target asset group whose supply leaves are
+    // being fetched.
+    oneof group_key {
+        // The 32-byte asset group key specified as raw bytes (gRPC only).
+        bytes group_key_bytes = 1;
+
+        // The 32-byte asset group key encoded as hex string (use this for
+        // REST).
+        string group_key_str = 2;
+    }
+
+    // The start block height for the range of supply leaves to fetch.
+    uint32 block_height_start = 3;
+
+    // The end block height for the range of supply leaves to fetch.
+    uint32 block_height_end = 4;
+
+    // Optional: A list of issuance leaf keys. For each key in this list,
+    // the endpoint will generate and return an inclusion proof.
+    repeated bytes issuance_leaf_keys = 5;
+
+    // Optional: A list of burn leaf keys. For each key in this list,
+    // the endpoint will generate and return an inclusion proof.
+    repeated bytes burn_leaf_keys = 6;
+
+    // Optional: A list of ignore leaf keys. For each key in this list, the
+    // endpoint will generate and return an inclusion proof.
+    repeated bytes ignore_leaf_keys = 7;
+}
+
+// SupplyLeafKey identifies a supply leaf entry. It contains the components
+// used to derive the key, which is computed as a hash of these fields.
+message SupplyLeafKey {
+    // The outpoint associated with the supply leaf.
+    Outpoint outpoint = 1;
+
+    // The script key of the supply leaf. This is the script key of the asset
+    // point.
+    bytes script_key = 2;
+
+    // The asset ID associated with the supply leaf. This is only set for
+    // ignore type supply leaves.
+    bytes asset_id = 3;
+}
+
+message SupplyLeafEntry {
+    // The key that identifies the supply leaf in the supply commitment subtree.
+    SupplyLeafKey leaf_key = 1;
+
+    // The merkle sum node representing the supply leaf in the supply commitment
+    // subtree.
+    MerkleSumNode leaf_node = 2;
+
+    // The block height at which the supply leaf was created.
+    uint32 block_height = 3;
+
+    // The raw serialized bytes of the supply leaf.
+    bytes raw_leaf = 4;
+}
+
+message SupplyLeafBlockHeader {
+    // Block header timestamp in seconds since unix epoch.
+    int64 timestamp = 1;
+
+    // 32-byte block header hash.
+    bytes hash = 2;
+}
+
+message FetchSupplyLeavesResponse {
+    repeated SupplyLeafEntry issuance_leaves = 1;
+    repeated SupplyLeafEntry burn_leaves = 2;
+    repeated SupplyLeafEntry ignore_leaves = 3;
+
+    // Inclusion proofs for each issuance leaf key provided in the request.
+    // Each entry corresponds to the key at the same index in
+    // `issuance_leaf_keys`.
+    repeated bytes issuance_leaf_inclusion_proofs = 4;
+
+    // Inclusion proofs for each burn leaf key provided in the request.
+    // Each entry corresponds to the key at the same index in `burn_leaf_keys`.
+    repeated bytes burn_leaf_inclusion_proofs = 5;
+
+    // Inclusion proofs for each ignored leaf key provided in the request.
+    // Each entry corresponds to the key at the same index in
+    // `ignore_leaf_keys`.
+    repeated bytes ignore_leaf_inclusion_proofs = 6;
+
+    // A map of block height to supply leaf block header for all block heights
+    // referenced in supply leaves.
+    map<uint32, SupplyLeafBlockHeader> block_headers = 7;
+}
+
+// SupplyCommitChainData represents the on-chain artifacts for a supply
+// commitment update.
+message SupplyCommitChainData {
+    // The raw transaction that created the root commitment.
+    bytes txn = 1;
+
+    // The index of the output in the transaction where the commitment resides.
+    uint32 tx_out_idx = 2;
+
+    // The internal key used to create the commitment output.
+    bytes internal_key = 3;
+
+    // The taproot output key used to create the commitment output.
+    bytes output_key = 4;
+
+    // The root hash of the supply tree that contains the set of
+    // sub-commitments. The sum value of this tree is the outstanding supply
+    // value.
+    bytes supply_root_hash = 5;
+
+    // The sum value of the supply root tree, representing the outstanding
+    // supply amount.
+    uint64 supply_root_sum = 6;
+
+    // The block header of the block that contains the supply commitment
+    // transaction.
+    bytes block_header = 7;
+
+    // The hash of the block that contains the commitment.
+    bytes block_hash = 8;
+
+    // The block height of the block that contains the supply commitment
+    // transaction.
+    uint32 block_height = 9;
+
+    // The merkle proof that proves that the supply commitment transaction is
+    // included in the block.
+    bytes tx_block_merkle_proof = 10;
+
+    // The index of the supply commitment transaction in the block.
+    uint32 tx_index = 11;
+
+    // The outpoint in the transaction where the commitment resides.
+    string commit_outpoint = 12;
+}
+
+message InsertSupplyCommitRequest {
+    // The unique identifier for the target asset group whose supply commitment
+    // is being inserted.
+    oneof group_key {
+        // The 32-byte asset group key specified as raw bytes (gRPC only).
+        bytes group_key_bytes = 1;
+
+        // The 32-byte asset group key encoded as hex string (use this for
+        // REST).
+        string group_key_str = 2;
+    }
+
+    // The supply commitment chain data that contains both the commitment and
+    // chain proof information.
+    SupplyCommitChainData chain_data = 3;
+
+    // The outpoint of the previous commitment that this new commitment is
+    // spending. This must be set unless this is the very first supply
+    // commitment of a grouped asset.
+    taprpc.OutPoint spent_commitment_outpoint = 4;
+
+    // The supply leaves that represent the supply changes for the asset group.
+    repeated SupplyLeafEntry issuance_leaves = 5;
+    repeated SupplyLeafEntry burn_leaves = 6;
+    repeated SupplyLeafEntry ignore_leaves = 7;
+}
+
+message InsertSupplyCommitResponse {
 }
