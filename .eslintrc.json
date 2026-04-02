@@ -1,0 +1,24 @@
+{
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "project": "./tsconfig.json"
+  },
+  "plugins": ["@typescript-eslint"],
+  "extends": [
+    "eslint:recommended",
+    "plugin:@typescript-eslint/recommended",
+    "prettier"
+  ],
+  "rules": {
+    "max-len": ["error", { "code": 120 }],
+    "new-parens": "error",
+    "no-caller": "error",
+    "no-bitwise": "error",
+    "no-cond-assign": "error",
+    "no-console": ["warn", { "allow": ["warn", "error"] }],
+    "no-var": "off",
+    "@typescript-eslint/ban-types": "off",
+    "@typescript-eslint/no-explicit-any": "off"
+  },
+  "ignorePatterns": ["dist", "lib/types/**/*", "lib/wasm_exec.js"]
+}
