@@ -1,4 +1,5 @@
 /* eslint-disable */
+import type { OpenChannelRequest, OutPoint } from './lightning';
 import type { RouteHint } from './swapserverrpc/common';
 
 /**
@@ -116,6 +117,14 @@ export enum FailureReason {
     UNRECOGNIZED = 'UNRECOGNIZED'
 }
 
+export enum LoopInSource {
+    /** LOOP_IN_SOURCE_WALLET - Use the legacy wallet-funded loop-in flow. */
+    LOOP_IN_SOURCE_WALLET = 'LOOP_IN_SOURCE_WALLET',
+    /** LOOP_IN_SOURCE_STATIC_ADDRESS - Use deposited static-address funds for loop-in autoloops. */
+    LOOP_IN_SOURCE_STATIC_ADDRESS = 'LOOP_IN_SOURCE_STATIC_ADDRESS',
+    UNRECOGNIZED = 'UNRECOGNIZED'
+}
+
 export enum LiquidityRuleType {
     UNKNOWN = 'UNKNOWN',
     THRESHOLD = 'THRESHOLD',
@@ -182,6 +191,16 @@ export enum AutoReason {
      * the portion of total swap amount that we allow fees to consume.
      */
     AUTO_REASON_FEE_INSUFFICIENT = 'AUTO_REASON_FEE_INSUFFICIENT',
+    /**
+     * AUTO_REASON_STATIC_LOOP_IN_NO_CANDIDATE - No static loop-in candidate indicates that static loop-in autoloop was
+     * selected, but no full-deposit static candidate fit the rule.
+     */
+    AUTO_REASON_STATIC_LOOP_IN_NO_CANDIDATE = 'AUTO_REASON_STATIC_LOOP_IN_NO_CANDIDATE',
+    /**
+     * AUTO_REASON_CUSTOM_CHANNEL_DATA - Custom channel data indicates that the target channel carries custom
+     * channel data and is excluded from the standard autoloop planner.
+     */
+    AUTO_REASON_CUSTOM_CHANNEL_DATA = 'AUTO_REASON_CUSTOM_CHANNEL_DATA',
     UNRECOGNIZED = 'UNRECOGNIZED'
 }
 
@@ -237,6 +256,16 @@ export enum DepositState {
      * has been sufficiently confirmed.
      */
     EXPIRED = 'EXPIRED',
+    /**
+     * OPENING_CHANNEL - OPENING_CHANNEL indicates that the channel open in which the deposit was
+     * used is in progress.
+     */
+    OPENING_CHANNEL = 'OPENING_CHANNEL',
+    /**
+     * CHANNEL_PUBLISHED - CHANNEL_PUBLISHED indicates that the channel open was finalized and
+     * published and that it should be managed from lnd from now on.
+     */
+    CHANNEL_PUBLISHED = 'CHANNEL_PUBLISHED',
     UNRECOGNIZED = 'UNRECOGNIZED'
 }
 
@@ -266,6 +295,22 @@ export enum StaticAddressLoopInSwapState {
     /** FAILED_STATIC_ADDRESS_SWAP -  */
     FAILED_STATIC_ADDRESS_SWAP = 'FAILED_STATIC_ADDRESS_SWAP',
     UNRECOGNIZED = 'UNRECOGNIZED'
+}
+
+export interface StaticOpenChannelRequest {
+    /**
+     * Wrap lnd's request so Loop can extend this RPC with Loop-specific fields
+     * without diverging from the upstream API surface.
+     */
+    openChannelRequest: OpenChannelRequest | undefined;
+}
+
+export interface StaticOpenChannelResponse {
+    /**
+     * The outpoint of the channel opening transaction in the format
+     * "txid:output_index".
+     */
+    channelOpenOutpoint: string;
 }
 
 export interface StopDaemonRequest {}
@@ -595,6 +640,59 @@ export interface ListSwapsResponse {
     swaps: SwapStatus[];
     /** Timestamp to use for paging start_timestamp_ns. */
     nextStartTime: string;
+}
+
+/** SweepHtlcRequest instructs loopd to sweep a swap HTLC via its success path. */
+export interface SweepHtlcRequest {
+    /**
+     * Optional override for the sweep destination; defaults to a new address
+     * derived from the connected lnd wallet.
+     */
+    destAddress: string;
+    /** Fee rate used for the sweep transaction in sat/vByte. */
+    satPerVbyte: number;
+    /** HTLC outpoint to sweep, formatted as "txid:vout". */
+    outpoint: string;
+    /** Optional override for the stored swap preimage. */
+    preimage: Uint8Array | string;
+    /** If true, publish the sweep transaction immediately. */
+    publish: boolean;
+    /**
+     * The HTLC address whose output is being swept; used to derive the
+     * expected pkScript.
+     */
+    htlcAddress: string;
+}
+
+/** SweepHtlcResponse returns the broadcast sweep transaction. */
+export interface SweepHtlcResponse {
+    /** Raw sweep transaction bytes. */
+    sweepTx: Uint8Array | string;
+    /** Miner fee paid by the sweep transaction. */
+    feeSats: string;
+    notRequested: PublishNotRequested | undefined;
+    published: PublishSucceeded | undefined;
+    failed: PublishFailed | undefined;
+}
+
+/**
+ * PublishNotRequested is returned by SweepHtlc if publishing was not requested
+ * in SweepHtlcRequest.
+ */
+export interface PublishNotRequested {}
+
+/**
+ * PublishSucceeded is returned by SweepHtlc if publishing was requested in
+ * SweepHtlcRequest and it succeeded.
+ */
+export interface PublishSucceeded {}
+
+/**
+ * PublishFailed is returned by SweepHtlc if publishing was requested in
+ * SweepHtlcRequest, but failed. It includes the error message.
+ */
+export interface PublishFailed {
+    error: string;
 }
 
 export interface SwapInfoRequest {
@@ -982,6 +1080,8 @@ export interface LiquidityParameters {
      * considered for easy autoloop swaps.
      */
     easyAutoloopExcludedPeers: Uint8Array | string[];
+    /** Selects which source autoloop uses for loop-in rules. */
+    loopInSource: LoopInSource;
 }
 
 export interface LiquidityParameters_EasyAssetParamsEntry {
@@ -1065,6 +1165,8 @@ export interface SuggestSwapsResponse {
     loopOut: LoopOutRequest[];
     /** The set of recommended loop in swaps */
     loopIn: LoopInRequest[];
+    /** The set of recommended static-address loop in swaps. */
+    staticLoopIn: StaticAddressLoopInRequest[];
     /**
      * Disqualified contains the set of channels that swaps are not recommended
      * for.
@@ -1243,15 +1345,6 @@ export interface WithdrawDepositsResponse {
     address: string;
 }
 
-export interface OutPoint {
-    /** Raw bytes representing the transaction id. */
-    txidBytes: Uint8Array | string;
-    /** Reversed, hex-encoded string representing the transaction id. */
-    txidStr: string;
-    /** The index of the output on the transaction. */
-    outputIndex: number;
-}
-
 export interface ListStaticAddressDepositsRequest {
     /** Filters the list of all stored deposits by deposit state. */
     stateFilter: DepositState;
@@ -1299,6 +1392,8 @@ export interface StaticAddressSummaryResponse {
     valueLoopedInSatoshis: string;
     /** The total value of all htlc timeout sweeps that the client swept. */
     valueHtlcTimeoutSweepsSatoshis: string;
+    /** The total value of all deposits that have been used for channel openings. */
+    valueChannelsOpened: string;
 }
 
 export interface Deposit {
@@ -1362,6 +1457,16 @@ export interface StaticAddressLoopInSwap {
     paymentRequestAmountSatoshis: string;
     /** The deposits that were used for this swap. */
     deposits: Deposit[];
+    /** Initiation time of the swap. */
+    initiationTime: string;
+    /** Last update time of the swap. */
+    lastUpdateTime: string;
+    /** Swap server cost. */
+    costServer: string;
+    /** On-chain transaction cost. */
+    costOnchain: string;
+    /** Off-chain routing fees. */
+    costOffchain: string;
 }
 
 export interface StaticAddressLoopInRequest {
@@ -1607,6 +1712,14 @@ export interface SwapClient {
         request?: DeepPartial<ListSwapsRequest>
     ): Promise<ListSwapsResponse>;
     /**
+     * loop: `sweephtlc`
+     * SweepHtlc spends a swap HTLC output via the preimage (success) path using
+     * the swap's known preimage or an optionally supplied one.
+     */
+    sweepHtlc(
+        request?: DeepPartial<SweepHtlcRequest>
+    ): Promise<SweepHtlcResponse>;
+    /**
      * loop: `swapinfo`
      * SwapInfo returns all known details about a single swap.
      */
@@ -1801,12 +1914,20 @@ export interface SwapClient {
         request?: DeepPartial<StaticAddressSummaryRequest>
     ): Promise<StaticAddressSummaryResponse>;
     /**
-     * loop:`static`
+     * loop:`static in`
      * StaticAddressLoopIn initiates a static address loop-in swap.
      */
     staticAddressLoopIn(
         request?: DeepPartial<StaticAddressLoopInRequest>
     ): Promise<StaticAddressLoopInResponse>;
+    /**
+     * loop:`static openchannel`
+     * StaticOpenChannel opens a channel funded by selected static address
+     * deposits.
+     */
+    staticOpenChannel(
+        request?: DeepPartial<StaticOpenChannelRequest>
+    ): Promise<StaticOpenChannelResponse>;
 }
 
 type Builtin =

@@ -1,5 +1,20 @@
 /* eslint-disable */
 
+/** ExecutionPolicy specifies how a quote request should be filled. */
+export enum ExecutionPolicy {
+    /**
+     * EXECUTION_POLICY_IOC - EXECUTION_POLICY_IOC is Immediate-Or-Cancel: accept any partial
+     * fill at or above the minimum threshold. This is the default.
+     */
+    EXECUTION_POLICY_IOC = 'EXECUTION_POLICY_IOC',
+    /**
+     * EXECUTION_POLICY_FOK - EXECUTION_POLICY_FOK is Fill-Or-Kill: the accepted rate must
+     * support the full maximum amount or the quote is rejected.
+     */
+    EXECUTION_POLICY_FOK = 'EXECUTION_POLICY_FOK',
+    UNRECOGNIZED = 'UNRECOGNIZED'
+}
+
 /** QuoteRespStatus is an enum that represents the status of a quote response. */
 export enum QuoteRespStatus {
     /**
@@ -17,6 +32,40 @@ export enum QuoteRespStatus {
      * price oracle whilst evaluating the quote response.
      */
     PRICE_ORACLE_QUERY_ERR = 'PRICE_ORACLE_QUERY_ERR',
+    /**
+     * PORTFOLIO_PILOT_ERR - PORTFOLIO_PILOT_ERR indicates that an unexpected error occurred in the
+     * portfolio pilot while evaluating the quote response.
+     */
+    PORTFOLIO_PILOT_ERR = 'PORTFOLIO_PILOT_ERR',
+    /**
+     * VALID_ACCEPT_QUOTE - VALID_ACCEPT_QUOTE indicates that the accepted quote passed all
+     * validation checks successfully.
+     */
+    VALID_ACCEPT_QUOTE = 'VALID_ACCEPT_QUOTE',
+    /**
+     * MIN_FILL_NOT_MET - MIN_FILL_NOT_MET indicates that the minimum fill constraint
+     * was not satisfiable at the accepted rate.
+     */
+    MIN_FILL_NOT_MET = 'MIN_FILL_NOT_MET',
+    /**
+     * RATE_BOUND_MISS - RATE_BOUND_MISS indicates that the accepted rate violated the
+     * requester's rate limit constraint.
+     */
+    RATE_BOUND_MISS = 'RATE_BOUND_MISS',
+    /**
+     * FOK_NOT_VIABLE - FOK_NOT_VIABLE indicates that the FOK execution policy could
+     * not be satisfied at the accepted rate.
+     */
+    FOK_NOT_VIABLE = 'FOK_NOT_VIABLE',
+    UNRECOGNIZED = 'UNRECOGNIZED'
+}
+
+/** RfqPolicyType indicates the type of policy of an RFQ session. */
+export enum RfqPolicyType {
+    /** RFQ_POLICY_TYPE_SALE - RFQ_POLICY_TYPE_SALE indicates that the RFQ session was a sale. */
+    RFQ_POLICY_TYPE_SALE = 'RFQ_POLICY_TYPE_SALE',
+    /** RFQ_POLICY_TYPE_PURCHASE - RFQ_POLICY_TYPE_PURCHASE indicates that the RFQ session was a purchase. */
+    RFQ_POLICY_TYPE_PURCHASE = 'RFQ_POLICY_TYPE_PURCHASE',
     UNRECOGNIZED = 'UNRECOGNIZED'
 }
 
@@ -107,6 +156,26 @@ export interface AddAssetBuyOrderRequest {
      * The maximum length of this field is 32'768 bytes.
      */
     priceOracleMetadata: string;
+    /**
+     * The optional minimum amount of the asset that the provider
+     * must be willing to offer. If set, must be less than or equal
+     * to asset_max_amt. When omitted, defaults to asset_max_amt
+     * (full-fill expected). Set explicitly to 0 to accept any
+     * partial fill.
+     */
+    assetMinAmt?: string | undefined;
+    /**
+     * An optional rate limit constraint expressed as a fixed-point number.
+     * For buy orders this is the minimum acceptable rate (asset units per
+     * BTC). If unset, no rate floor is enforced.
+     */
+    assetRateLimit: FixedPoint | undefined;
+    /**
+     * The execution policy for this order. IOC (default) accepts any
+     * partial fill >= min threshold. FOK requires the rate to support
+     * the full max amount.
+     */
+    executionPolicy: ExecutionPolicy;
 }
 
 export interface AddAssetBuyOrderResponse {
@@ -162,6 +231,26 @@ export interface AddAssetSellOrderRequest {
      * The maximum length of this field is 32'768 bytes.
      */
     priceOracleMetadata: string;
+    /**
+     * The optional minimum msat amount that the responding peer
+     * must agree to pay. If set, must be less than or equal to
+     * payment_max_amt. When omitted, defaults to payment_max_amt
+     * (full-fill expected). Set explicitly to 0 to accept any
+     * partial fill (units: millisats).
+     */
+    paymentMinAmt?: string | undefined;
+    /**
+     * An optional rate limit constraint expressed as a fixed-point number.
+     * For sell orders this is the maximum acceptable rate (asset units per
+     * BTC). If unset, no rate ceiling is enforced.
+     */
+    assetRateLimit: FixedPoint | undefined;
+    /**
+     * The execution policy for this order. IOC (default) accepts any
+     * partial fill >= min threshold. FOK requires the rate to support
+     * the full max amount.
+     */
+    executionPolicy: ExecutionPolicy;
 }
 
 export interface AddAssetSellOrderResponse {
@@ -254,6 +343,12 @@ export interface PeerAcceptedBuyQuote {
     priceOracleMetadata: string;
     /** The subject asset specifier. */
     assetSpec: AssetSpec | undefined;
+    /**
+     * accepted_max_amount is an optional negotiated fill quantity. When
+     * non-zero the responder accepted up to this many asset units instead
+     * of the full request max.
+     */
+    acceptedMaxAmount: string;
 }
 
 export interface PeerAcceptedSellQuote {
@@ -293,6 +388,12 @@ export interface PeerAcceptedSellQuote {
     priceOracleMetadata: string;
     /** The subject asset specifier. */
     assetSpec: AssetSpec | undefined;
+    /**
+     * accepted_max_amount is an optional negotiated fill quantity. When
+     * non-zero the responder accepted up to this many msat instead of the
+     * full request max.
+     */
+    acceptedMaxAmount: string;
 }
 
 /**
@@ -380,6 +481,100 @@ export interface RfqEvent {
     acceptHtlc: AcceptHtlcEvent | undefined;
 }
 
+export interface ForwardingHistoryRequest {
+    /**
+     * min_timestamp is the minimum Unix timestamp in seconds. Only forwarding
+     * events that settled at or after this time are returned. If not set, there
+     * is no lower bound.
+     */
+    minTimestamp: string;
+    /**
+     * max_timestamp is the maximum Unix timestamp in seconds. Only forwarding
+     * events that settled at or before this time are returned. If not set,
+     * there is no upper bound.
+     */
+    maxTimestamp: string;
+    /**
+     * peer is the optional counterparty peer's public key. If set,
+     * only forwarding events involving this peer are returned.
+     */
+    peer: Uint8Array | string;
+    /**
+     * asset_specifier optionally filters forwarding events by asset ID or group
+     * key.
+     */
+    assetSpecifier: AssetSpecifier | undefined;
+    /** limit is the maximum number of records to return. */
+    limit: number;
+    /** offset is the number of records to skip for pagination. */
+    offset: number;
+}
+
+export interface ForwardingHistoryResponse {
+    /**
+     * forwards is the list of completed asset forwarding events matching the
+     * query.
+     */
+    forwards: ForwardingEvent[];
+    /**
+     * total_count is the total number of forwards matching the filter (before
+     * pagination is applied). This can be used for pagination.
+     */
+    totalCount: string;
+}
+
+export interface ForwardingEvent {
+    /**
+     * rfq_id is the unique identifier of the RFQ session that governed this
+     * forward.
+     */
+    rfqId: Uint8Array | string;
+    /** chan_id_in is the short channel ID of the incoming channel. */
+    chanIdIn: string;
+    /** chan_id_out is the short channel ID of the outgoing channel. */
+    chanIdOut: string;
+    /** htlc_id is the HTLC ID on the incoming channel. */
+    htlcId: string;
+    /**
+     * opened_at is the Unix timestamp in seconds when the forward was
+     * initiated.
+     */
+    openedAt: string;
+    /**
+     * settled_at is the Unix timestamp in seconds when the forward settled.
+     * A value of 0 means the forward has not settled yet.
+     */
+    settledAt: string;
+    /**
+     * failed_at is the Unix timestamp in seconds when the forward failed.
+     * A value of 0 means the forward has not failed.
+     */
+    failedAt: string;
+    /** asset_amt is the asset amount that was swapped. */
+    assetAmt: string;
+    /**
+     * amt_in_msat is the actual amount received on the incoming channel in
+     * millisatoshis.
+     */
+    amtInMsat: string;
+    /**
+     * amt_out_msat is the actual amount sent on the outgoing channel in
+     * millisatoshis.
+     */
+    amtOutMsat: string;
+    /**
+     * policy_type indicates whether this was a sale or purchase of assets
+     * from the edge node's perspective.
+     */
+    policyType: RfqPolicyType;
+    /** peer is the counterparty peer's public key as a hex string. */
+    peer: string;
+    /** asset_specifier identifies the asset that was swapped. */
+    assetSpec: AssetSpec | undefined;
+    /** rate is the exchange rate that was used for this swap. */
+    rate: FixedPoint | undefined;
+}
+
 export interface Rfq {
     /**
      * tapcli: `rfq buyorder`
@@ -450,6 +645,14 @@ export interface Rfq {
         onMessage?: (msg: RfqEvent) => void,
         onError?: (err: Error) => void
     ): void;
+    /**
+     * tapcli: `rfq forwardinghistory`
+     * ForwardingHistory is used to query for completed asset forwarding events.
+     * These are historical records of HTLCs that were settled successfully.
+     */
+    forwardingHistory(
+        request?: DeepPartial<ForwardingHistoryRequest>
+    ): Promise<ForwardingHistoryResponse>;
 }
 
 type Builtin =

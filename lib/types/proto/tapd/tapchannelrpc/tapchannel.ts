@@ -1,9 +1,11 @@
 /* eslint-disable */
-import type { SendPaymentRequest as SendPaymentRequest1 } from '../routerrpc/router';
 import type {
+    ExecutionPolicy,
     PeerAcceptedSellQuote,
+    FixedPoint,
     PeerAcceptedBuyQuote
 } from '../rfqrpc/rfq';
+import type { SendPaymentRequest as SendPaymentRequest1 } from '../routerrpc/router';
 import type {
     Payment,
     Invoice,
@@ -239,6 +241,23 @@ export interface AddInvoiceRequest {
      * The maximum length of this field is 32'768 bytes.
      */
     priceOracleMetadata: string;
+    /**
+     * Optional minimum asset amount the peer must accept.
+     * Forwarded to AddAssetBuyOrder. When omitted, defaults
+     * to the full asset amount (full-fill expected). Set
+     * explicitly to 0 to accept any partial fill.
+     */
+    assetMinAmt?: string | undefined;
+    /**
+     * Optional rate floor (asset units per BTC) as a
+     * fixed-point number. Forwarded to AddAssetBuyOrder.
+     */
+    assetRateLimit: FixedPoint | undefined;
+    /**
+     * Execution policy (IOC default, FOK). Forwarded to
+     * AddAssetBuyOrder.
+     */
+    executionPolicy: ExecutionPolicy;
 }
 
 export interface AddInvoiceResponse {
@@ -285,10 +304,8 @@ export interface AssetPayReqResponse {
     /** The group the asset ID belong to, if applicable. */
     assetGroup: AssetGroup | undefined;
     /**
-     * Genesis information for the asset ID which includes the meta hash, and
-     * asset ID. This is only set if the payment request was decoded with an
-     * asset ID and not with a group key (since a group can contain assets from
-     * different minting events or genesis infos).
+     * Always populated. For group-key queries, the asset_id reflects the
+     * resolved tranche's genesis ID.
      */
     genesisInfo: GenesisInfo | undefined;
     /** The normal decoded payment request. */

@@ -438,6 +438,34 @@ export interface MuSig2RegisterNoncesResponse {
     haveAllNonces: boolean;
 }
 
+export interface MuSig2RegisterCombinedNonceRequest {
+    /**
+     * The unique ID of the signing session the combined nonce should be registered
+     * with.
+     */
+    sessionId: Uint8Array | string;
+    /**
+     * The 66-byte combined public nonce that was aggregated externally. This is a
+     * concatenation of two 33-byte compressed public keys (R1 || R2).
+     */
+    combinedPublicNonce: Uint8Array | string;
+}
+
+export interface MuSig2RegisterCombinedNonceResponse {}
+
+export interface MuSig2GetCombinedNonceRequest {
+    /** The unique ID of the signing session to get the combined nonce for. */
+    sessionId: Uint8Array | string;
+}
+
+export interface MuSig2GetCombinedNonceResponse {
+    /**
+     * The 66-byte combined public nonce. This is a concatenation of two 33-byte
+     * compressed public keys (R1 || R2).
+     */
+    combinedPublicNonce: Uint8Array | string;
+}
+
 export interface MuSig2SignRequest {
     /** The unique ID of the signing session to use for signing. */
     sessionId: Uint8Array | string;
@@ -591,6 +619,34 @@ export interface Signer {
     muSig2RegisterNonces(
         request?: DeepPartial<MuSig2RegisterNoncesRequest>
     ): Promise<MuSig2RegisterNoncesResponse>;
+    /**
+     * MuSig2RegisterCombinedNonce (experimental!) registers a pre-aggregated
+     * combined nonce for a signing session. This is an alternative to
+     * MuSig2RegisterNonces and is used when a coordinator has already aggregated
+     * all individual nonces and wants to distribute the combined nonce to
+     * participants.
+     *
+     * NOTE: This method is mutually exclusive with MuSig2RegisterNonces for the
+     * same session. The MuSig2 BIP is not final yet and therefore this API must
+     * be considered to be HIGHLY EXPERIMENTAL and subject to change in upcoming
+     * releases. Backward compatibility is not guaranteed!
+     */
+    muSig2RegisterCombinedNonce(
+        request?: DeepPartial<MuSig2RegisterCombinedNonceRequest>
+    ): Promise<MuSig2RegisterCombinedNonceResponse>;
+    /**
+     * MuSig2GetCombinedNonce (experimental!) retrieves the combined nonce for a
+     * signing session. This will be available after either all individual nonces
+     * have been registered via MuSig2RegisterNonces, or a combined nonce has been
+     * registered via MuSig2RegisterCombinedNonce.
+     *
+     * NOTE: The MuSig2 BIP is not final yet and therefore this API must be
+     * considered to be HIGHLY EXPERIMENTAL and subject to change in upcoming
+     * releases. Backward compatibility is not guaranteed!
+     */
+    muSig2GetCombinedNonce(
+        request?: DeepPartial<MuSig2GetCombinedNonceRequest>
+    ): Promise<MuSig2GetCombinedNonceResponse>;
     /**
      * MuSig2Sign (experimental!) creates a partial signature using the local
      * signing key that was specified when the session was created. This can only

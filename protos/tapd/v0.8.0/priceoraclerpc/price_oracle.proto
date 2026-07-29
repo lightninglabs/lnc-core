@@ -81,6 +81,17 @@ enum Intent {
     INTENT_RECV_PAYMENT_QUALIFY = 6;
 }
 
+// ErrorCode represents the possible error codes that can be returned in a
+// QueryAssetRatesErrResponse.
+enum ErrorCode {
+    // UNSPECIFIED_ORACLE_ERROR_CODE indicates an unspecified error.
+    UNSPECIFIED_ORACLE_ERROR_CODE = 0;
+
+    // UNSUPPORTED_ASSET_ORACLE_ERROR_CODE indicates the asset is not
+    // supported.
+    UNSUPPORTED_ASSET_ORACLE_ERROR_CODE = 1;
+}
+
 // FixedPoint is a scaled integer representation of a fractional number.
 //
 // This type consists of two integer fields: a coefficient and a scale.
@@ -213,6 +224,14 @@ message QueryAssetRatesRequest {
     // is available. The maximum length of this field is 32'768 bytes. This
     // field will only be set by tapd v0.7.0 and later.
     string metadata = 9;
+
+    // node_id is the 33-byte public key of the local node making the
+    // request to the price oracle. This identifies the tapd node that is
+    // querying rates, as opposed to the counterparty_id field which
+    // identifies the peer on the other side of the transaction. This field
+    // is set by default and can be disabled via the
+    // --experimental.rfq.priceoracledisablenodeid configuration option.
+    bytes node_id = 10;
 }
 
 // QueryAssetRatesOkResponse is the successful response to a
@@ -228,7 +247,7 @@ message QueryAssetRatesErrResponse {
     string message = 1;
 
     // code is the error code.
-    uint32 code = 2;
+    ErrorCode code = 2;
 }
 
 // QueryAssetRatesResponse is the response from a QueryAssetRates RPC call.

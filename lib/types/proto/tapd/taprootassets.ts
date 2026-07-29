@@ -1,5 +1,5 @@
 /* eslint-disable */
-import type { OutPoint } from './tapcommon';
+import type { SortDirection, OutPoint } from './tapcommon';
 
 export enum AssetType {
     /**
@@ -244,6 +244,72 @@ export interface AssetMeta {
     metaHash: Uint8Array | string;
 }
 
+/**
+ * AssetSpecifier is a union type for specifying an asset by either its asset ID
+ * or group key.
+ */
+export interface AssetSpecifier {
+    /** The 32-byte asset ID specified as raw bytes (gRPC only). */
+    assetId: Uint8Array | string | undefined;
+    /** The 32-byte asset ID encoded as a hex string (use this for REST). */
+    assetIdStr: string | undefined;
+    /** The 32-byte asset group key specified as raw bytes (gRPC only). */
+    groupKey: Uint8Array | string | undefined;
+    /**
+     * The 32-byte asset group key encoded as hex string (use this for
+     * REST).
+     */
+    groupKeyStr: string | undefined;
+}
+
+export interface FetchAssetRequest {
+    /**
+     * The asset specifier (asset ID or group key) identifying the asset(s) to
+     * fetch. At least one of asset_id or group_key must be specified.
+     */
+    assetSpecifier: AssetSpecifier | undefined;
+    /**
+     * Whether to include each asset's witness in the response. The witness
+     * either contains the spending signatures or the split commitment witness,
+     * which can both be large and usually aren't very useful on the command
+     * line, so are omitted by default.
+     */
+    withWitness: boolean;
+    /**
+     * Include assets that are marked as spent (which is always true for burn
+     * or tombstone assets).
+     */
+    includeSpent: boolean;
+    /**
+     * Include assets that are leased (locked/reserved) by the daemon for a
+     * pending transfer. Leased assets cannot be used by the daemon until the
+     * pending transfer is confirmed or the lease expires.
+     */
+    includeLeased: boolean;
+    /**
+     * List assets that aren't confirmed yet. Only freshly minted assets will
+     * show in the asset list with a block height of 0. All other forms of
+     * unconfirmed assets will not appear in the list until the transaction is
+     * confirmed (check either transfers or receives for unconfirmed outbound or
+     * inbound assets).
+     */
+    includeUnconfirmedMints: boolean;
+    /**
+     * The script key type to filter the assets by. If not set, only assets with
+     * a BIP-0086 script key will be returned (which is the equivalent of
+     * setting script_key_type.explicit_type = SCRIPT_KEY_BIP86). If the type
+     * is set to SCRIPT_KEY_BURN or SCRIPT_KEY_TOMBSTONE the include_spent flag
+     * will automatically be set to true, because assets of that type are always
+     * marked as spent.
+     */
+    scriptKeyType: ScriptKeyTypeQuery | undefined;
+}
+
+export interface FetchAssetResponse {
+    /** The list of assets matching the specifier and filters. */
+    assets: Asset[];
+}
+
 export interface ListAssetRequest {
     /**
      * Whether to include each asset's witness in the response. The witness
@@ -290,6 +356,18 @@ export interface ListAssetRequest {
      * marked as spent.
      */
     scriptKeyType: ScriptKeyTypeQuery | undefined;
+    /** The number of assets to skip (for pagination). */
+    offset: number;
+    /**
+     * The maximum number of assets to return (for pagination). If 0, a
+     * default of 512 is used. The maximum allowed value is 16384.
+     */
+    limit: number;
+    /**
+     * The sort direction of the returned assets, sorted by asset primary key
+     * (creation order). Defaults to descending.
+     */
+    direction: SortDirection;
 }
 
 export interface AnchorInfo {
@@ -883,6 +961,13 @@ export interface TransferInput {
     scriptKey: Uint8Array | string;
     /** The amount of the asset that was spent. */
     amount: string;
+    /**
+     * The group key of the asset that was spent, if the asset belongs to a
+     * group. Empty for assets that are not part of a group.
+     */
+    groupKey: Uint8Array | string;
+    /** The type of the asset that was spent. */
+    assetType: AssetType;
 }
 
 export interface TransferOutputAnchor {
@@ -998,6 +1083,14 @@ export interface TransferOutput {
      * format. For older versions, this field will be empty.
      */
     tapAddr: string;
+    /**
+     * The group key of the asset that was created in this output, if the
+     * asset belongs to a group. Empty for assets that are not part of a
+     * group.
+     */
+    groupKey: Uint8Array | string;
+    /** The type of the asset that was created in this output. */
+    assetType: AssetType;
 }
 
 export interface StopRequest {}
@@ -1172,9 +1265,10 @@ export interface ScriptKeyTypeQuery {
 
 export interface ScriptKey {
     /**
-     * The full Taproot output key the asset is locked to. This is either a BIP-86
-     * key if the tap_tweak below is empty, or a key with the tap tweak applied to
-     * it.
+     * The full Taproot output key the asset is locked to, as a
+     * 32-byte x-only (Schnorr) public key. This is either a
+     * BIP-86 key if the tap_tweak below is empty, or a key with
+     * the tap tweak applied to it.
      */
     pubKey: Uint8Array | string;
     /** The key descriptor describing the internal key of the above Taproot key. */
@@ -1417,6 +1511,12 @@ export interface AddrReceivesRequest {
      * If not set, no end time filtering is applied.
      */
     endTimestamp: string;
+    /** The number of events to skip. */
+    offset: number;
+    /** The max number of events returned. */
+    limit: number;
+    /** The direction of the page. Sorted by creation time. */
+    direction: SortDirection;
 }
 
 export interface AddrReceivesResponse {
@@ -1583,9 +1683,19 @@ export interface FetchAssetMetaResponse_UnknownOddTypesEntry {
 }
 
 export interface BurnAssetRequest {
-    /** The asset ID of the asset to burn units of. */
+    /**
+     * Deprecated, the asset ID of the asset to burn units of.
+     * Use asset_specifier instead.
+     *
+     * @deprecated
+     */
     assetId: Uint8Array | string | undefined;
-    /** The hex encoded asset ID of the asset to burn units of. */
+    /**
+     * Deprecated, the hex encoded asset ID of the asset to burn units of.
+     * Use asset_specifier instead.
+     *
+     * @deprecated
+     */
     assetIdStr: string | undefined;
     /** The number of asset units to burn. This must be greater than zero. */
     amountToBurn: string;
@@ -1597,13 +1707,29 @@ export interface BurnAssetRequest {
     confirmationText: string;
     /** A note that may contain user defined metadata related to this burn. */
     note: string;
+    /**
+     * The asset specifier identifying which asset to burn. Supports both
+     * asset ID and group key. This field supersedes the deprecated
+     * asset_id/asset_id_str fields above.
+     */
+    assetSpecifier: AssetSpecifier | undefined;
 }
 
 export interface BurnAssetResponse {
     /** The asset transfer that contains the asset burn as an output. */
     burnTransfer: AssetTransfer | undefined;
-    /** The burn transition proof for the asset burn output. */
+    /**
+     * Deprecated: Use burn_proofs instead.
+     *
+     * @deprecated
+     */
     burnProof: DecodedProof | undefined;
+    /**
+     * The burn transition proofs for the asset burn outputs. May contain
+     * more than one entry when burning by group key across multiple
+     * issuances.
+     */
+    burnProofs: DecodedProof[];
 }
 
 export interface ListBurnsRequest {
@@ -1626,6 +1752,8 @@ export interface AssetBurn {
     amount: string;
     /** The txid of the transaction that the burn was anchored to. */
     anchorTxid: Uint8Array | string;
+    /** The type of the burnt asset. */
+    assetType: AssetType;
 }
 
 export interface ListBurnsResponse {
@@ -1651,7 +1779,12 @@ export interface ReceiveEvent {
     timestamp: string;
     /** The address that received the asset. */
     address: Addr | undefined;
-    /** The outpoint of the transaction that was used to receive the asset. */
+    /**
+     * The outpoint of the transaction that was used to receive
+     * the asset. To resolve the received amount, use
+     * ListAssets with the anchor_outpoint filter set to this
+     * outpoint.
+     */
     outpoint: string;
     /**
      * The status of the event. If error below is set, then the status is the
@@ -1770,6 +1903,30 @@ export interface RegisterTransferResponse {
     registeredAsset: Asset | undefined;
 }
 
+export interface MacaroonPermission {
+    /** The entity a permission grants access to. */
+    entity: string;
+    /** The action that is granted. */
+    action: string;
+}
+
+export interface BakeMacaroonRequest {
+    /** The list of permissions the new macaroon should grant. */
+    permissions: MacaroonPermission[];
+    /** The root key ID used to create the macaroon, must be a non-negative integer. */
+    rootKeyId: string;
+    /**
+     * Informs the RPC on whether to allow external permissions that tapd is not
+     * aware of.
+     */
+    allowExternalPermissions: boolean;
+}
+
+export interface BakeMacaroonResponse {
+    /** The hex encoded macaroon, serialized in binary format. */
+    macaroon: string;
+}
+
 export interface TaprootAssets {
     /**
      * tapcli: `assets list`
@@ -1778,6 +1935,15 @@ export interface TaprootAssets {
     listAssets(
         request?: DeepPartial<ListAssetRequest>
     ): Promise<ListAssetResponse>;
+    /**
+     * tapcli: `assets fetch`
+     * FetchAsset fetches asset(s) by asset ID or group key, with optional
+     * filters. At least one of asset_id or group_key must be set in the
+     * asset_specifier.
+     */
+    fetchAsset(
+        request?: DeepPartial<FetchAssetRequest>
+    ): Promise<FetchAssetResponse>;
     /**
      * tapcli: `assets utxos`
      * ListUtxos lists the UTXOs managed by the target daemon, and the assets they
@@ -1914,6 +2080,15 @@ export interface TaprootAssets {
      * GetInfo returns the information for the node.
      */
     getInfo(request?: DeepPartial<GetInfoRequest>): Promise<GetInfoResponse>;
+    /**
+     * tapcli: `bakemacaroon`
+     * BakeMacaroon allows the creation of a new macaroon with custom
+     * permissions. No first-party caveats are added since this can be done
+     * offline.
+     */
+    bakeMacaroon(
+        request?: DeepPartial<BakeMacaroonRequest>
+    ): Promise<BakeMacaroonResponse>;
     /**
      * tapcli: `assets meta`
      * FetchAssetMeta allows a caller to fetch the reveal meta data for an asset

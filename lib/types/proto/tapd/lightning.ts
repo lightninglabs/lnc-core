@@ -74,8 +74,23 @@ export enum CommitmentType {
      */
     SCRIPT_ENFORCED_LEASE = 'SCRIPT_ENFORCED_LEASE',
     /**
-     * SIMPLE_TAPROOT - A channel that uses musig2 for the funding output, and the new tapscript
-     * features where relevant.
+     * TAPROOT - The production taproot channel type that uses musig2 for the funding
+     * output and the new tapscript features, with final scripts and feature
+     * bits 80/81. This is the recommended taproot variant; new integrations
+     * should select this enum value.
+     */
+    TAPROOT = 'TAPROOT',
+    /**
+     * SIMPLE_TAPROOT_FINAL - Deprecated alias for TAPROOT, preserved so existing clients that select
+     * the production taproot channel type by its historic name continue to
+     * compile and serialize against the same wire value.
+     */
+    SIMPLE_TAPROOT_FINAL = 'SIMPLE_TAPROOT_FINAL',
+    /**
+     * SIMPLE_TAPROOT - A legacy taproot channel type that uses musig2 for the funding output and
+     * the new tapscript features, but with development scripts and the staging
+     * feature bits. Retained for compatibility with peers that have not upgraded
+     * to TAPROOT; new integrations should prefer TAPROOT.
      */
     SIMPLE_TAPROOT = 'SIMPLE_TAPROOT',
     /**
@@ -138,6 +153,14 @@ export enum ResolutionOutcome {
     FIRST_STAGE = 'FIRST_STAGE',
     /** TIMEOUT - A htlc was timed out on chain. */
     TIMEOUT = 'TIMEOUT',
+    UNRECOGNIZED = 'UNRECOGNIZED'
+}
+
+export enum GraphCacheStatus {
+    GRAPH_CACHE_STATUS_DISABLED = 'GRAPH_CACHE_STATUS_DISABLED',
+    GRAPH_CACHE_STATUS_LOADING = 'GRAPH_CACHE_STATUS_LOADING',
+    GRAPH_CACHE_STATUS_LOADED = 'GRAPH_CACHE_STATUS_LOADED',
+    GRAPH_CACHE_STATUS_FAILED = 'GRAPH_CACHE_STATUS_FAILED',
     UNRECOGNIZED = 'UNRECOGNIZED'
 }
 
@@ -242,7 +265,10 @@ export interface CustomMessage {
 }
 
 export interface SendCustomMessageRequest {
-    /** Peer to send the message to */
+    /**
+     * Peer to which the message will be sent. Represented as a byte-encoded
+     * public key
+     */
     peer: Uint8Array | string;
     /**
      * Message type. This value needs to be in the custom range (>= 32768).
@@ -257,6 +283,80 @@ export interface SendCustomMessageRequest {
 
 export interface SendCustomMessageResponse {
     /** The status of the send operation. */
+    status: string;
+}
+
+export interface SubscribeOnionMessagesRequest {}
+
+export interface OnionMessageUpdate {
+    /**
+     * Peer from which this message originates. Represented as a byte-encoded
+     * public key.
+     */
+    peer: Uint8Array | string;
+    /**
+     * PathKey is used to derive the blinded node id by tweaking the hop's
+     * static public key. The hop uses the corresponding blinded private key
+     * together with the sender's ephemeral key to perform ECDH and obtain the
+     * shared secret for decrypting the onion payload. Separately, for
+     * decrypting `encrypted_recipient_data`, the recipient performs ECDH
+     * between its static node private key and the path_key to derive the
+     * decryption key.
+     */
+    pathKey: Uint8Array | string;
+    /**
+     * Serialized Sphinx onion packet (BOLT 4) containing the layered, per-hop
+     * encrypted payloads and routing instructions used to forward this message
+     * along its designated path.
+     */
+    onion: Uint8Array | string;
+    /**
+     * reply_path is the blinded path that should be used when replying to a
+     * received message.
+     */
+    replyPath: BlindedPath | undefined;
+    /**
+     * encrypted_recipient_data is the encrypted data that contains the
+     * forwarding information for an onion message. It contains either
+     * next_node_id or short_channel_id for each non-final node. It MAY contain
+     * the path_id for the final node.
+     */
+    encryptedRecipientData: Uint8Array | string;
+    /**
+     * Custom onion message tlv records. These are customized fields that are
+     * not defined by LND and cannot be extracted.
+     */
+    customRecords: { [key: string]: Uint8Array | string };
+}
+
+export interface OnionMessageUpdate_CustomRecordsEntry {
+    key: string;
+    value: Uint8Array | string;
+}
+
+export interface SendOnionMessageRequest {
+    /** Peer to send the message to */
+    peer: Uint8Array | string;
+    /**
+     * PathKey is used to derive the blinded node id by tweaking the hop's
+     * static public key. The hop uses the corresponding blinded private key
+     * together with the sender's ephemeral key to perform ECDH and obtain the
+     * shared secret for decrypting the onion payload. Separately, for
+     * decrypting `encrypted_recipient_data`, the recipient performs ECDH
+     * between its static node private key and the path_key to derive the
+     * decryption key.
+     */
+    pathKey: Uint8Array | string;
+    /**
+     * Serialized Sphinx onion packet (BOLT 4) containing the layered, per-hop
+     * encrypted payloads and routing instructions used to forward this message
+     * along its designated path.
+     */
+    onion: Uint8Array | string;
+}
+
+export interface SendOnionMessageResponse {
+    /** The status of the onion message send operation. */
     status: string;
 }
 
@@ -380,129 +480,6 @@ export interface FeeLimit {
     fixedMsat: string | undefined;
     /** The fee limit expressed as a percentage of the payment amount. */
     percent: string | undefined;
-}
-
-export interface SendRequest {
-    /**
-     * The identity pubkey of the payment recipient. When using REST, this field
-     * must be encoded as base64.
-     */
-    dest: Uint8Array | string;
-    /**
-     * The hex-encoded identity pubkey of the payment recipient. Deprecated now
-     * that the REST gateway supports base64 encoding of bytes fields.
-     *
-     * @deprecated
-     */
-    destString: string;
-    /**
-     * The amount to send expressed in satoshis.
-     *
-     * The fields amt and amt_msat are mutually exclusive.
-     */
-    amt: string;
-    /**
-     * The amount to send expressed in millisatoshis.
-     *
-     * The fields amt and amt_msat are mutually exclusive.
-     */
-    amtMsat: string;
-    /**
-     * The hash to use within the payment's HTLC. When using REST, this field
-     * must be encoded as base64.
-     */
-    paymentHash: Uint8Array | string;
-    /**
-     * The hex-encoded hash to use within the payment's HTLC. Deprecated now
-     * that the REST gateway supports base64 encoding of bytes fields.
-     *
-     * @deprecated
-     */
-    paymentHashString: string;
-    /**
-     * A bare-bones invoice for a payment within the Lightning Network. With the
-     * details of the invoice, the sender has all the data necessary to send a
-     * payment to the recipient.
-     */
-    paymentRequest: string;
-    /**
-     * The CLTV delta from the current height that should be used to set the
-     * timelock for the final hop.
-     */
-    finalCltvDelta: number;
-    /**
-     * The maximum number of satoshis that will be paid as a fee of the payment.
-     * This value can be represented either as a percentage of the amount being
-     * sent, or as a fixed amount of the maximum fee the user is willing the pay to
-     * send the payment. If not specified, lnd will use a default value of 100%
-     * fees for small amounts (<=1k sat) or 5% fees for larger amounts.
-     */
-    feeLimit: FeeLimit | undefined;
-    /**
-     * The channel id of the channel that must be taken to the first hop. If zero,
-     * any channel may be used.
-     */
-    outgoingChanId: string;
-    /** The pubkey of the last hop of the route. If empty, any hop may be used. */
-    lastHopPubkey: Uint8Array | string;
-    /**
-     * An optional maximum total time lock for the route. This should not exceed
-     * lnd's `--max-cltv-expiry` setting. If zero, then the value of
-     * `--max-cltv-expiry` is enforced.
-     */
-    cltvLimit: number;
-    /**
-     * An optional field that can be used to pass an arbitrary set of TLV records
-     * to a peer which understands the new records. This can be used to pass
-     * application specific data during the payment attempt. Record types are
-     * required to be in the custom range >= 65536. When using REST, the values
-     * must be encoded as base64.
-     */
-    destCustomRecords: { [key: string]: Uint8Array | string };
-    /** If set, circular payments to self are permitted. */
-    allowSelfPayment: boolean;
-    /**
-     * Features assumed to be supported by the final node. All transitive feature
-     * dependencies must also be set properly. For a given feature bit pair, either
-     * optional or remote may be set, but not both. If this field is nil or empty,
-     * the router will try to load destination features from the graph as a
-     * fallback.
-     */
-    destFeatures: FeatureBit[];
-    /**
-     * The payment address of the generated invoice.  This is also called
-     * payment secret in specifications (e.g. BOLT 11).
-     */
-    paymentAddr: Uint8Array | string;
-}
-
-export interface SendRequest_DestCustomRecordsEntry {
-    key: string;
-    value: Uint8Array | string;
-}
-
-export interface SendResponse {
-    paymentError: string;
-    paymentPreimage: Uint8Array | string;
-    paymentRoute: Route | undefined;
-    paymentHash: Uint8Array | string;
-}
-
-export interface SendToRouteRequest {
-    /**
-     * The payment hash to use for the HTLC. When using REST, this field must be
-     * encoded as base64.
-     */
-    paymentHash: Uint8Array | string;
-    /**
-     * An optional hex-encoded payment hash to be used for the HTLC. Deprecated now
-     * that the REST gateway supports base64 encoding of bytes fields.
-     *
-     * @deprecated
-     */
-    paymentHashString: string;
-    /** Route that should be used to attempt to complete the payment. */
-    route: Route | undefined;
 }
 
 export interface ChannelAcceptRequest {
@@ -674,6 +651,8 @@ export interface EstimateFeeRequest {
     spendUnconfirmed: boolean;
     /** The strategy to use for selecting coins during fees estimation. */
     coinSelectionStrategy: CoinSelectionStrategy;
+    /** A list of selected inputs for the transaction. */
+    inputs: OutPoint[];
 }
 
 export interface EstimateFeeRequest_AddrToAmountEntry {
@@ -693,6 +672,8 @@ export interface EstimateFeeResponse {
     feerateSatPerByte: string;
     /** The fee rate in satoshi/vbyte. */
     satPerVbyte: string;
+    /** A list of selected inputs for the transaction the estimate is for. */
+    inputs: OutPoint[];
 }
 
 export interface SendManyRequest {
@@ -1360,6 +1341,13 @@ export interface GetInfoResponse {
     requireHtlcInterceptor: boolean;
     /** Indicates whether final htlc resolutions are stored on disk. */
     storeFinalHtlcResolutions: boolean;
+    /**
+     * Whether the wallet is fully synced to the best chain. This indicates the
+     * wallet's internal sync state with the backing chain source.
+     */
+    walletSynced: boolean;
+    /** The current status of the in-memory graph cache. */
+    graphCacheStatus: GraphCacheStatus;
 }
 
 export interface GetInfoResponse_FeaturesEntry {
@@ -1367,7 +1355,13 @@ export interface GetInfoResponse_FeaturesEntry {
     value: Feature | undefined;
 }
 
-export interface GetDebugInfoRequest {}
+export interface GetDebugInfoRequest {
+    /**
+     * If set to true, the log file content will be included in the response.
+     * By default, only the config information is returned.
+     */
+    includeLog: boolean;
+}
 
 export interface GetDebugInfoResponse {
     config: { [key: string]: string };
@@ -2159,6 +2153,22 @@ export interface PendingChannelsResponse_WaitingCloseChannel {
      * include_raw_tx in the request is true.
      */
     closingTxHex: string;
+    /**
+     * Remaining number of confirmations until the channel closure is
+     * considered final and removed from waiting close. Channel closes
+     * require multiple confirmations for reorg protection — the exact
+     * number scales with channel capacity. A closing transaction that
+     * gets reorganized out of the chain resets this counter. When the
+     * closing transaction is not yet confirmed, this value equals the
+     * total number of confirmations required.
+     */
+    blocksTilCloseConfirmed: number;
+    /**
+     * The block height at which the closing transaction was first confirmed.
+     * This will be zero if the closing transaction has not yet confirmed, or
+     * if this information is not available for older channels.
+     */
+    closeHeight: number;
 }
 
 export interface PendingChannelsResponse_Commitments {
@@ -2230,6 +2240,10 @@ export enum PendingChannelsResponse_ForceClosedChannel_AnchorState {
 
 export interface ChannelEventSubscription {}
 
+export interface ChannelCommitUpdate {
+    channel: Channel | undefined;
+}
+
 export interface ChannelEventUpdate {
     openChannel: Channel | undefined;
     closedChannel: ChannelCloseSummary | undefined;
@@ -2238,6 +2252,7 @@ export interface ChannelEventUpdate {
     pendingOpenChannel: PendingUpdate | undefined;
     fullyResolvedChannel: ChannelPoint | undefined;
     channelFundingTimeout: ChannelPoint | undefined;
+    updatedChannel: ChannelCommitUpdate | undefined;
     type: ChannelEventUpdate_UpdateType;
 }
 
@@ -2249,6 +2264,7 @@ export enum ChannelEventUpdate_UpdateType {
     PENDING_OPEN_CHANNEL = 'PENDING_OPEN_CHANNEL',
     FULLY_RESOLVED_CHANNEL = 'FULLY_RESOLVED_CHANNEL',
     CHANNEL_FUNDING_TIMEOUT = 'CHANNEL_FUNDING_TIMEOUT',
+    CHANNEL_UPDATE = 'CHANNEL_UPDATE',
     UNRECOGNIZED = 'UNRECOGNIZED'
 }
 
@@ -2409,13 +2425,6 @@ export interface QueryRoutesRequest {
      * REST, the values must be encoded as base64.
      */
     destCustomRecords: { [key: string]: Uint8Array | string };
-    /**
-     * Deprecated, use outgoing_chan_ids. The channel id of the channel that must
-     * be taken to the first hop. If zero, any channel may be used.
-     *
-     * @deprecated
-     */
-    outgoingChanId: string;
     /** The pubkey of the last hop of the route. If empty, any hop may be used. */
     lastHopPubkey: Uint8Array | string;
     /** Optional route hints to reach the destination through private channels. */
@@ -3580,6 +3589,11 @@ export interface ListPaymentsRequest {
      * it. Measured in seconds since the unix epoch.
      */
     creationDateEnd: string;
+    /**
+     * If set, omit hop-level route data for HTLC attempts to reduce query
+     * cost and response size.
+     */
+    omitHops: boolean;
 }
 
 export interface ListPaymentsResponse {
@@ -4728,55 +4742,6 @@ export interface Lightning {
         request?: DeepPartial<AbandonChannelRequest>
     ): Promise<AbandonChannelResponse>;
     /**
-     * lncli: `sendpayment`
-     * Deprecated, use routerrpc.SendPaymentV2. SendPayment dispatches a
-     * bi-directional streaming RPC for sending payments through the Lightning
-     * Network. A single RPC invocation creates a persistent bi-directional
-     * stream allowing clients to rapidly send payments through the Lightning
-     * Network with a single persistent connection.
-     *
-     * @deprecated
-     */
-    sendPayment(
-        request?: DeepPartial<SendRequest>,
-        onMessage?: (msg: SendResponse) => void,
-        onError?: (err: Error) => void
-    ): void;
-    /**
-     * Deprecated, use routerrpc.SendPaymentV2. SendPaymentSync is the synchronous
-     * non-streaming version of SendPayment. This RPC is intended to be consumed by
-     * clients of the REST proxy. Additionally, this RPC expects the destination's
-     * public key and the payment hash (if any) to be encoded as hex strings.
-     *
-     * @deprecated
-     */
-    sendPaymentSync(request?: DeepPartial<SendRequest>): Promise<SendResponse>;
-    /**
-     * lncli: `sendtoroute`
-     * Deprecated, use routerrpc.SendToRouteV2. SendToRoute is a bi-directional
-     * streaming RPC for sending payment through the Lightning Network. This
-     * method differs from SendPayment in that it allows users to specify a full
-     * route manually. This can be used for things like rebalancing, and atomic
-     * swaps.
-     *
-     * @deprecated
-     */
-    sendToRoute(
-        request?: DeepPartial<SendToRouteRequest>,
-        onMessage?: (msg: SendResponse) => void,
-        onError?: (err: Error) => void
-    ): void;
-    /**
-     * Deprecated, use routerrpc.SendToRouteV2. SendToRouteSync is a synchronous
-     * version of SendToRoute. It Will block until the payment either fails or
-     * succeeds.
-     *
-     * @deprecated
-     */
-    sendToRouteSync(
-        request?: DeepPartial<SendToRouteRequest>
-    ): Promise<SendResponse>;
-    /**
      * lncli: `addinvoice`
      * AddInvoice attempts to add a new invoice to the invoice database. Any
      * duplicated invoices are rejected, therefore all invoices *must* have a
@@ -5111,6 +5076,22 @@ export interface Lightning {
     subscribeCustomMessages(
         request?: DeepPartial<SubscribeCustomMessagesRequest>,
         onMessage?: (msg: CustomMessage) => void,
+        onError?: (err: Error) => void
+    ): void;
+    /**
+     * lncli: `sendonion`
+     * SendOnionMessage sends an onion message to a peer.
+     */
+    sendOnionMessage(
+        request?: DeepPartial<SendOnionMessageRequest>
+    ): Promise<SendOnionMessageResponse>;
+    /**
+     * lncli: `subscribeonion`
+     * SubscribeOnionMessages subscribes to a stream of incoming onion messages.
+     */
+    subscribeOnionMessages(
+        request?: DeepPartial<SubscribeOnionMessagesRequest>,
+        onMessage?: (msg: OnionMessageUpdate) => void,
         onError?: (err: Error) => void
     ): void;
     /**

@@ -26,6 +26,25 @@ export enum CoinSelectType {
     UNRECOGNIZED = 'UNRECOGNIZED'
 }
 
+/** BackupMode specifies the backup format to use when exporting. */
+export enum BackupMode {
+    /** RAW - RAW exports a full backup with complete proof data (v1). */
+    RAW = 'RAW',
+    /**
+     * COMPACT - COMPACT strips blockchain-derivable fields from proofs,
+     * reducing size. Stripped fields are reconstructed from the
+     * blockchain on import (v2).
+     */
+    COMPACT = 'COMPACT',
+    /**
+     * OPTIMISTIC - OPTIMISTIC stores no proof data. Proofs are fetched from
+     * a universe server on import. Smallest backup but requires
+     * a reachable universe server during restore (v3).
+     */
+    OPTIMISTIC = 'OPTIMISTIC',
+    UNRECOGNIZED = 'UNRECOGNIZED'
+}
+
 export interface FundVirtualPsbtRequest {
     /** Use an existing PSBT packet as the template for the funded PSBT. */
     psbt: Uint8Array | string | undefined;
@@ -395,6 +414,43 @@ export interface DeclareScriptKeyResponse {
     scriptKey: ScriptKey | undefined;
 }
 
+export interface ExportAssetWalletBackupRequest {
+    /**
+     * The backup mode to use for the export. If not set, defaults to RAW
+     * (protobuf zero value). The CLI defaults to COMPACT for smaller
+     * backups; callers that want compact mode should set this explicitly.
+     */
+    mode: BackupMode;
+}
+
+export interface ExportAssetWalletBackupResponse {
+    /**
+     * The binary backup blob containing all data necessary to restore the
+     * wallet's assets.
+     */
+    backup: Uint8Array | string;
+}
+
+export interface ImportAssetsFromBackupRequest {
+    /**
+     * The binary backup blob that was previously created using
+     * ExportAssetWalletBackup.
+     */
+    backup: Uint8Array | string;
+}
+
+export interface ImportAssetsFromBackupResponse {
+    /** The number of assets that were successfully imported. */
+    numImported: number;
+    /**
+     * The number of assets that were skipped due to errors
+     * during import. Details are logged server-side. Skipped
+     * assets may include those with verification failures,
+     * missing proofs, or other per-asset data issues.
+     */
+    numSkipped: number;
+}
+
 export interface AssetWallet {
     /**
      * FundVirtualPsbt selects inputs from the available asset commitments to fund
@@ -505,6 +561,22 @@ export interface AssetWallet {
     declareScriptKey(
         request?: DeepPartial<DeclareScriptKeyRequest>
     ): Promise<DeclareScriptKeyResponse>;
+    /**
+     * ExportAssetWalletBackup exports a backup of all active assets in the wallet.
+     * The backup includes all data necessary to restore the assets in case of
+     * database or system failure.
+     */
+    exportAssetWalletBackup(
+        request?: DeepPartial<ExportAssetWalletBackupRequest>
+    ): Promise<ExportAssetWalletBackupResponse>;
+    /**
+     * ImportAssetsFromBackup imports assets from a backup blob that was previously
+     * created using ExportAssetWalletBackup. This can be used to restore assets
+     * after database loss or to migrate assets to a new wallet.
+     */
+    importAssetsFromBackup(
+        request?: DeepPartial<ImportAssetsFromBackupRequest>
+    ): Promise<ImportAssetsFromBackupResponse>;
 }
 
 type Builtin =

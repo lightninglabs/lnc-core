@@ -1,4 +1,5 @@
 /* eslint-disable */
+import type { SortDirection, AssetOutPoint, OutPoint } from '../tapcommon';
 import type {
     AssetType,
     Asset,
@@ -6,7 +7,6 @@ import type {
     GenesisReveal,
     GroupKeyReveal
 } from '../taprootassets';
-import type { AssetOutPoint, OutPoint } from '../tapcommon';
 
 export enum ProofType {
     PROOF_TYPE_UNSPECIFIED = 'PROOF_TYPE_UNSPECIFIED',
@@ -38,12 +38,6 @@ export enum AssetQuerySort {
     SORT_BY_TOTAL_PROOFS = 'SORT_BY_TOTAL_PROOFS',
     SORT_BY_GENESIS_HEIGHT = 'SORT_BY_GENESIS_HEIGHT',
     SORT_BY_TOTAL_SUPPLY = 'SORT_BY_TOTAL_SUPPLY',
-    UNRECOGNIZED = 'UNRECOGNIZED'
-}
-
-export enum SortDirection {
-    SORT_DIRECTION_ASC = 'SORT_DIRECTION_ASC',
-    SORT_DIRECTION_DESC = 'SORT_DIRECTION_DESC',
     UNRECOGNIZED = 'UNRECOGNIZED'
 }
 
@@ -144,6 +138,8 @@ export interface AssetRootResponse {
      * map is the 32-byte asset_id or group key hash.
      */
     universeRoots: { [key: string]: UniverseRoot };
+    /** Indicates whether there are more results beyond the current page. */
+    hasMore: boolean;
 }
 
 export interface AssetRootResponse_UniverseRootsEntry {
@@ -170,6 +166,13 @@ export interface DeleteRootQuery {
 
 export interface DeleteRootResponse {}
 
+export interface DeleteAssetLeafRequest {
+    /** The universe key identifying the leaf to delete. */
+    key: UniverseKey | undefined;
+}
+
+export interface DeleteAssetLeafResponse {}
+
 export interface Outpoint {
     /** The output as a hex encoded (and reversed!) string. */
     hashStr: string;
@@ -195,9 +198,25 @@ export interface AssetLeafKeysRequest {
     direction: SortDirection;
 }
 
+export interface AssetLeavesRequest {
+    /** The ID of the asset to query for. */
+    id: ID | undefined;
+    /** The offset for the page. */
+    offset: number;
+    /** The length limit for the page. */
+    limit: number;
+    /** The direction of the page. */
+    direction: SortDirection;
+}
+
 export interface AssetLeafKeyResponse {
     /** The set of asset leaf keys for the given asset ID or group key. */
     assetKeys: AssetKey[];
+    /**
+     * Indicates whether there are more results beyond the current
+     * page.
+     */
+    hasMore: boolean;
 }
 
 export interface AssetLeaf {
@@ -214,6 +233,11 @@ export interface AssetLeaf {
 export interface AssetLeafResponse {
     /** The set of asset leaves for the given asset ID or group key. */
     leaves: AssetLeaf[];
+    /**
+     * Indicates whether there are more results beyond the current
+     * page.
+     */
+    hasMore: boolean;
 }
 
 export interface UniverseKey {
@@ -481,6 +505,11 @@ export interface AssetStatsAsset {
 export interface UniverseAssetStats {
     /** The asset statistics snapshot for the queried assets. */
     assetStats: AssetStatsSnapshot[];
+    /**
+     * Indicates whether there are more results beyond the current
+     * page.
+     */
+    hasMore: boolean;
 }
 
 export interface QueryEventsRequest {
@@ -920,6 +949,14 @@ export interface Universe {
         request?: DeepPartial<DeleteRootQuery>
     ): Promise<DeleteRootResponse>;
     /**
+     * tapcli: `universe delete-leaf`
+     * DeleteAssetLeaf deletes a single Universe leaf, identified by its
+     * universe ID and leaf key (outpoint + script key).
+     */
+    deleteAssetLeaf(
+        request?: DeepPartial<DeleteAssetLeafRequest>
+    ): Promise<DeleteAssetLeafResponse>;
+    /**
      * tapcli: `universe keys`
      * AssetLeafKeys queries for the set of Universe keys associated with a given
      * asset_id or group_key. Each key takes the form: (outpoint, script_key),
@@ -939,7 +976,9 @@ export interface Universe {
      * took place on chain. The leaves contain a normal Taproot Asset proof, as
      * well as details for the asset.
      */
-    assetLeaves(request?: DeepPartial<ID>): Promise<AssetLeafResponse>;
+    assetLeaves(
+        request?: DeepPartial<AssetLeavesRequest>
+    ): Promise<AssetLeafResponse>;
     /**
      * tapcli: `universe proofs query`
      * QueryProof attempts to query for an issuance or transfer proof for a given
@@ -1017,7 +1056,7 @@ export interface Universe {
      */
     universeStats(request?: DeepPartial<StatsRequest>): Promise<StatsResponse>;
     /**
-     * tapcli `universe stats assets`
+     * tapcli: `universe stats assets`
      * QueryAssetStats returns a set of statistics for a given set of assets.
      * Stats can be queried for all assets, or based on the: asset ID, name, or
      * asset type. Pagination is supported via the offset and limit params.
@@ -1027,7 +1066,7 @@ export interface Universe {
         request?: DeepPartial<AssetStatsQuery>
     ): Promise<UniverseAssetStats>;
     /**
-     * tapcli `universe stats events`
+     * tapcli: `universe stats events`
      * QueryEvents returns the number of sync and proof events for a given time
      * period, grouped by day.
      */

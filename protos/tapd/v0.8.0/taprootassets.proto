@@ -12,6 +12,13 @@ service TaprootAssets {
     */
     rpc ListAssets (ListAssetRequest) returns (ListAssetResponse);
 
+    /* tapcli: `assets fetch`
+    FetchAsset fetches asset(s) by asset ID or group key, with optional
+    filters. At least one of asset_id or group_key must be set in the
+    asset_specifier.
+    */
+    rpc FetchAsset (FetchAssetRequest) returns (FetchAssetResponse);
+
     /* tapcli: `assets utxos`
     ListUtxos lists the UTXOs managed by the target daemon, and the assets they
     hold.
@@ -125,6 +132,13 @@ service TaprootAssets {
     */
     rpc GetInfo (GetInfoRequest) returns (GetInfoResponse);
 
+    /* tapcli: `bakemacaroon`
+    BakeMacaroon allows the creation of a new macaroon with custom
+    permissions. No first-party caveats are added since this can be done
+    offline.
+    */
+    rpc BakeMacaroon (BakeMacaroonRequest) returns (BakeMacaroonResponse);
+
     /* tapcli: `assets meta`
     FetchAssetMeta allows a caller to fetch the reveal meta data for an asset
     either by the asset ID for that asset, or a meta hash.
@@ -207,6 +221,66 @@ message AssetMeta {
     bytes meta_hash = 3;
 }
 
+// AssetSpecifier is a union type for specifying an asset by either its asset ID
+// or group key.
+message AssetSpecifier {
+    oneof id {
+        // The 32-byte asset ID specified as raw bytes (gRPC only).
+        bytes asset_id = 1;
+
+        // The 32-byte asset ID encoded as a hex string (use this for REST).
+        string asset_id_str = 2;
+
+        // The 32-byte asset group key specified as raw bytes (gRPC only).
+        bytes group_key = 3;
+
+        // The 32-byte asset group key encoded as hex string (use this for
+        // REST).
+        string group_key_str = 4;
+    }
+}
+
+message FetchAssetRequest {
+    // The asset specifier (asset ID or group key) identifying the asset(s) to
+    // fetch. At least one of asset_id or group_key must be specified.
+    AssetSpecifier asset_specifier = 1;
+
+    // Whether to include each asset's witness in the response. The witness
+    // either contains the spending signatures or the split commitment witness,
+    // which can both be large and usually aren't very useful on the command
+    // line, so are omitted by default.
+    bool with_witness = 2;
+
+    // Include assets that are marked as spent (which is always true for burn
+    // or tombstone assets).
+    bool include_spent = 3;
+
+    // Include assets that are leased (locked/reserved) by the daemon for a
+    // pending transfer. Leased assets cannot be used by the daemon until the
+    // pending transfer is confirmed or the lease expires.
+    bool include_leased = 4;
+
+    // List assets that aren't confirmed yet. Only freshly minted assets will
+    // show in the asset list with a block height of 0. All other forms of
+    // unconfirmed assets will not appear in the list until the transaction is
+    // confirmed (check either transfers or receives for unconfirmed outbound or
+    // inbound assets).
+    bool include_unconfirmed_mints = 5;
+
+    // The script key type to filter the assets by. If not set, only assets with
+    // a BIP-0086 script key will be returned (which is the equivalent of
+    // setting script_key_type.explicit_type = SCRIPT_KEY_BIP86). If the type
+    // is set to SCRIPT_KEY_BURN or SCRIPT_KEY_TOMBSTONE the include_spent flag
+    // will automatically be set to true, because assets of that type are always
+    // marked as spent.
+    ScriptKeyTypeQuery script_key_type = 6;
+}
+
+message FetchAssetResponse {
+    // The list of assets matching the specifier and filters.
+    repeated Asset assets = 1;
+}
+
 message ListAssetRequest {
     // Whether to include each asset's witness in the response. The witness
     // either contains the spending signatures or the split commitment witness,
@@ -252,6 +326,17 @@ message ListAssetRequest {
     // will automatically be set to true, because assets of that type are always
     // marked as spent.
     ScriptKeyTypeQuery script_key_type = 10;
+
+    // The number of assets to skip (for pagination).
+    int32 offset = 11;
+
+    // The maximum number of assets to return (for pagination). If 0, a
+    // default of 512 is used. The maximum allowed value is 16384.
+    int32 limit = 12;
+
+    // The sort direction of the returned assets, sorted by asset primary key
+    // (creation order). Defaults to descending.
+    SortDirection direction = 13;
 }
 
 message AnchorInfo {
@@ -853,6 +938,13 @@ message TransferInput {
 
     // The amount of the asset that was spent.
     uint64 amount = 4;
+
+    // The group key of the asset that was spent, if the asset belongs to a
+    // group. Empty for assets that are not part of a group.
+    bytes group_key = 5;
+
+    // The type of the asset that was spent.
+    AssetType asset_type = 6;
 }
 
 message TransferOutputAnchor {
@@ -987,6 +1079,14 @@ message TransferOutput {
     // only set for new outputs for tapd versions that support the address V2
     // format. For older versions, this field will be empty.
     string tap_addr = 14;
+
+    // The group key of the asset that was created in this output, if the
+    // asset belongs to a group. Empty for assets that are not part of a
+    // group.
+    bytes group_key = 15;
+
+    // The type of the asset that was created in this output.
+    AssetType asset_type = 16;
 }
 
 message StopRequest {
@@ -1260,9 +1360,10 @@ message ScriptKeyTypeQuery {
 
 message ScriptKey {
     /*
-    The full Taproot output key the asset is locked to. This is either a BIP-86
-    key if the tap_tweak below is empty, or a key with the tap tweak applied to
-    it.
+    The full Taproot output key the asset is locked to, as a
+    32-byte x-only (Schnorr) public key. This is either a
+    BIP-86 key if the tap_tweak below is empty, or a key with
+    the tap tweak applied to it.
     */
     bytes pub_key = 1;
 
@@ -1528,6 +1629,15 @@ message AddrReceivesRequest {
     // Filter receives by creation time less than or equal to this timestamp.
     // If not set, no end time filtering is applied.
     uint64 end_timestamp = 4;
+
+    // The number of events to skip.
+    int32 offset = 5;
+
+    // The max number of events returned.
+    int32 limit = 6;
+
+    // The direction of the page. Sorted by creation time.
+    SortDirection direction = 7;
 }
 
 message AddrReceivesResponse {
@@ -1697,12 +1807,15 @@ message FetchAssetMetaResponse {
 }
 
 message BurnAssetRequest {
+    // Deprecated: Use asset_specifier instead.
     oneof asset {
-        // The asset ID of the asset to burn units of.
-        bytes asset_id = 1;
+        // Deprecated, the asset ID of the asset to burn units of.
+        // Use asset_specifier instead.
+        bytes asset_id = 1 [deprecated = true];
 
-        // The hex encoded asset ID of the asset to burn units of.
-        string asset_id_str = 2;
+        // Deprecated, the hex encoded asset ID of the asset to burn units of.
+        // Use asset_specifier instead.
+        string asset_id_str = 2 [deprecated = true];
     }
 
     // The number of asset units to burn. This must be greater than zero.
@@ -1715,14 +1828,24 @@ message BurnAssetRequest {
 
     // A note that may contain user defined metadata related to this burn.
     string note = 5;
+
+    // The asset specifier identifying which asset to burn. Supports both
+    // asset ID and group key. This field supersedes the deprecated
+    // asset_id/asset_id_str fields above.
+    AssetSpecifier asset_specifier = 6;
 }
 
 message BurnAssetResponse {
     // The asset transfer that contains the asset burn as an output.
     AssetTransfer burn_transfer = 1;
 
-    // The burn transition proof for the asset burn output.
-    DecodedProof burn_proof = 2;
+    // Deprecated: Use burn_proofs instead.
+    DecodedProof burn_proof = 2 [deprecated = true];
+
+    // The burn transition proofs for the asset burn outputs. May contain
+    // more than one entry when burning by group key across multiple
+    // issuances.
+    repeated DecodedProof burn_proofs = 3;
 }
 
 message ListBurnsRequest {
@@ -1751,6 +1874,9 @@ message AssetBurn {
 
     // The txid of the transaction that the burn was anchored to.
     bytes anchor_txid = 5;
+
+    // The type of the burnt asset.
+    AssetType asset_type = 6;
 }
 
 message ListBurnsResponse {
@@ -1775,7 +1901,10 @@ message ReceiveEvent {
     // The address that received the asset.
     taprpc.Addr address = 2;
 
-    // The outpoint of the transaction that was used to receive the asset.
+    // The outpoint of the transaction that was used to receive
+    // the asset. To resolve the received amount, use
+    // ListAssets with the anchor_outpoint filter set to this
+    // outpoint.
     string outpoint = 3;
 
     // The status of the event. If error below is set, then the status is the
@@ -1956,4 +2085,33 @@ message RegisterTransferRequest {
 message RegisterTransferResponse {
     // The asset transfer that was registered.
     Asset registered_asset = 1;
+}
+
+message MacaroonPermission {
+    // The entity a permission grants access to.
+    string entity = 1;
+
+    // The action that is granted.
+    string action = 2;
+}
+
+message BakeMacaroonRequest {
+    // The list of permissions the new macaroon should grant.
+    repeated MacaroonPermission permissions = 1;
+
+    /*
+    The root key ID used to create the macaroon, must be a non-negative integer.
+    */
+    uint64 root_key_id = 2;
+
+    /*
+    Informs the RPC on whether to allow external permissions that tapd is not
+    aware of.
+    */
+    bool allow_external_permissions = 3;
+}
+
+message BakeMacaroonResponse {
+    // The hex encoded macaroon, serialized in binary format.
+    string macaroon = 1;
 }
