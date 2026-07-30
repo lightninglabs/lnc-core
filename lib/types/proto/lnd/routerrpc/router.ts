@@ -5,11 +5,10 @@ import type {
     RouteHint,
     FeatureBit,
     Route,
-    Failure,
-    HTLCAttempt,
     ChannelPoint,
     AliasMap,
-    Payment
+    Payment,
+    HTLCAttempt
 } from '../lightning';
 
 export enum FailureDetail {
@@ -36,30 +35,11 @@ export enum FailureDetail {
     INVALID_KEYSEND = 'INVALID_KEYSEND',
     MPP_IN_PROGRESS = 'MPP_IN_PROGRESS',
     CIRCULAR_ROUTE = 'CIRCULAR_ROUTE',
-    UNRECOGNIZED = 'UNRECOGNIZED'
-}
-
-export enum PaymentState {
-    /** IN_FLIGHT - Payment is still in flight. */
-    IN_FLIGHT = 'IN_FLIGHT',
-    /** SUCCEEDED - Payment completed successfully. */
-    SUCCEEDED = 'SUCCEEDED',
-    /** FAILED_TIMEOUT - There are more routes to try, but the payment timeout was exceeded. */
-    FAILED_TIMEOUT = 'FAILED_TIMEOUT',
-    /**
-     * FAILED_NO_ROUTE - All possible routes were tried and failed permanently. Or were no
-     * routes to the destination at all.
-     */
-    FAILED_NO_ROUTE = 'FAILED_NO_ROUTE',
-    /** FAILED_ERROR - A non-recoverable error has occurred. */
-    FAILED_ERROR = 'FAILED_ERROR',
-    /**
-     * FAILED_INCORRECT_PAYMENT_DETAILS - Payment details incorrect (unknown hash, invalid amt or
-     * invalid final cltv delta)
-     */
-    FAILED_INCORRECT_PAYMENT_DETAILS = 'FAILED_INCORRECT_PAYMENT_DETAILS',
-    /** FAILED_INSUFFICIENT_BALANCE - Insufficient local balance. */
-    FAILED_INSUFFICIENT_BALANCE = 'FAILED_INSUFFICIENT_BALANCE',
+    INVOICE_ALREADY_SETTLED = 'INVOICE_ALREADY_SETTLED',
+    HTLC_INVOICE_TYPE_MISMATCH = 'HTLC_INVOICE_TYPE_MISMATCH',
+    AMP_ERROR = 'AMP_ERROR',
+    AMP_RECONSTRUCTION = 'AMP_RECONSTRUCTION',
+    EXTERNAL_VALIDATION_FAILED = 'EXTERNAL_VALIDATION_FAILED',
     UNRECOGNIZED = 'UNRECOGNIZED'
 }
 
@@ -129,14 +109,6 @@ export interface SendPaymentRequest {
      * The fields fee_limit_sat and fee_limit_msat are mutually exclusive.
      */
     feeLimitSat: string;
-    /**
-     * Deprecated, use outgoing_chan_ids. The channel id of the channel that must
-     * be taken to the first hop. If zero, any channel may be used (unless
-     * outgoing_chan_ids are set).
-     *
-     * @deprecated
-     */
-    outgoingChanId: string;
     /**
      * An optional maximum total time lock for the route. This should not
      * exceed lnd's `--max-cltv-expiry` setting. If zero, then the value of
@@ -339,13 +311,6 @@ export interface SendToRouteRequest {
 export interface SendToRouteRequest_FirstHopCustomRecordsEntry {
     key: string;
     value: Uint8Array | string;
-}
-
-export interface SendToRouteResponse {
-    /** The preimage obtained by making the payment. */
-    preimage: Uint8Array | string;
-    /** The failure message in case the payment failed. */
-    failure: Failure | undefined;
 }
 
 export interface ResetMissionControlRequest {}
@@ -694,15 +659,6 @@ export interface LinkFailEvent {
     failureString: string;
 }
 
-export interface PaymentStatus {
-    /** Current state the payment is in. */
-    state: PaymentState;
-    /** The pre-image of the payment when state is SUCCEEDED. */
-    preimage: Uint8Array | string;
-    /** The HTLCs made in attempt to settle the payment [EXPERIMENTAL]. */
-    htlcs: HTLCAttempt[];
-}
-
 export interface CircuitKey {
     /** / The id of the channel that the is part of this circuit. */
     chanId: string;
@@ -714,6 +670,10 @@ export interface ForwardHtlcInterceptRequest {
     /**
      * The key of this forwarded htlc. It defines the incoming channel id and
      * the index in this channel.
+     *
+     * Interceptor clients should handle requests for the same circuit key
+     * idempotently. Requests may be replayed after reconnect, and an htlc that was
+     * previously offered off-chain may be offered again after it moves on-chain.
      */
     incomingCircuitKey: CircuitKey | undefined;
     /** The incoming htlc amount. */
@@ -742,7 +702,8 @@ export interface ForwardHtlcInterceptRequest {
     onionBlob: Uint8Array | string;
     /**
      * The block height at which this htlc will be auto-failed to prevent the
-     * channel from force-closing.
+     * channel from force-closing. For on-chain htlcs, this field is the
+     * settlement deadline instead and no automatic fail-back is attempted.
      */
     autoFailHeight: number;
     /** The custom records of the peer's incoming p2p wire message. */
@@ -767,6 +728,14 @@ export interface ForwardHtlcInterceptRequest_InWireCustomRecordsEntry {
  * field modifications.
  * - `Reject`: Fail the htlc backwards.
  * - `Settle`: Settle this htlc with a given preimage.
+ *
+ * Once the incoming channel has force-closed and the HTLC is being resolved
+ * on-chain (see auto_fail_height), only `Settle` has any effect. The HTLC can no
+ * longer be resumed or failed back off-chain, so `Resume`, `ResumeModified`, and
+ * `Fail` return a stream-terminating error. The HTLC stays held until it is
+ * settled with a preimage, the on-chain resolver completes, or it expires
+ * on-chain. Clients should reconnect to receive any held HTLCs that remain
+ * unresolved.
  */
 export interface ForwardHtlcInterceptResponse {
     /**
@@ -856,12 +825,44 @@ export interface FindBaseAliasResponse {
     base: string;
 }
 
+export interface DeleteForwardingHistoryRequest {
+    /**
+     * Absolute Unix timestamp (seconds). Events at or before this time
+     * are deleted.
+     */
+    deleteBeforeTime: string | undefined;
+    /**
+     * Relative duration string indicating how far back to delete, e.g.
+     * "-30d" deletes events at or before 30 days ago.
+     * Standard Go: "-24h", "-1.5h"
+     * Custom units: "-1d", "-1w", "-1M", "-1y"
+     * Supported: ns, us/µs, ms, s, m, h, d (days), w (weeks),
+     * M (months=30.44d), y (years=365.25d).
+     * Use negative values to specify time in the past.
+     */
+    deleteBeforeDuration: string | undefined;
+}
+
+export interface DeleteForwardingHistoryResponse {
+    /** Number of forwarding events deleted. */
+    eventsDeleted: string;
+    /**
+     * Total fees earned from deleted events (in millisatoshis).
+     * This is the sum of (amt_in - amt_out) for all deleted events, which
+     * can be used for accounting purposes.
+     */
+    totalFeeMsat: string;
+    /** Status message. */
+    status: string;
+}
+
 /**
  * Router is a service that offers advanced interaction with the router
  * subsystem of the daemon.
  */
 export interface Router {
     /**
+     * lncli: `sendpayment`
      * SendPaymentV2 attempts to route a payment described by the passed
      * PaymentRequest to the final destination. The call returns a stream of
      * payment updates. When using this RPC, make sure to set a fee limit, as the
@@ -898,6 +899,7 @@ export interface Router {
         onError?: (err: Error) => void
     ): void;
     /**
+     * lncli: `estimateroutefee`
      * EstimateRouteFee allows callers to obtain a lower bound w.r.t how much it
      * may cost to send an HTLC to the target end destination.
      */
@@ -905,18 +907,7 @@ export interface Router {
         request?: DeepPartial<RouteFeeRequest>
     ): Promise<RouteFeeResponse>;
     /**
-     * Deprecated, use SendToRouteV2. SendToRoute attempts to make a payment via
-     * the specified route. This method differs from SendPayment in that it
-     * allows users to specify a full route manually. This can be used for
-     * things like rebalancing, and atomic swaps. It differs from the newer
-     * SendToRouteV2 in that it doesn't return the full HTLC information.
-     *
-     * @deprecated
-     */
-    sendToRoute(
-        request?: DeepPartial<SendToRouteRequest>
-    ): Promise<SendToRouteResponse>;
-    /**
+     * lncli: `sendtoroute`
      * SendToRouteV2 attempts to make a payment via the specified route. This
      * method differs from SendPayment in that it allows users to specify a full
      * route manually. This can be used for things like rebalancing, and atomic
@@ -999,29 +990,6 @@ export interface Router {
         onError?: (err: Error) => void
     ): void;
     /**
-     * Deprecated, use SendPaymentV2. SendPayment attempts to route a payment
-     * described by the passed PaymentRequest to the final destination. The call
-     * returns a stream of payment status updates.
-     *
-     * @deprecated
-     */
-    sendPayment(
-        request?: DeepPartial<SendPaymentRequest>,
-        onMessage?: (msg: PaymentStatus) => void,
-        onError?: (err: Error) => void
-    ): void;
-    /**
-     * Deprecated, use TrackPaymentV2. TrackPayment returns an update stream for
-     * the payment identified by the payment hash.
-     *
-     * @deprecated
-     */
-    trackPayment(
-        request?: DeepPartial<TrackPaymentRequest>,
-        onMessage?: (msg: PaymentStatus) => void,
-        onError?: (err: Error) => void
-    ): void;
-    /**
      * HtlcInterceptor dispatches a bi-directional streaming RPC in which
      * Forwarded HTLC requests are sent to the client and the client responds with
      * a boolean that tells LND if this htlc should be intercepted.
@@ -1070,6 +1038,19 @@ export interface Router {
     xFindBaseLocalChanAlias(
         request?: DeepPartial<FindBaseAliasRequest>
     ): Promise<FindBaseAliasResponse>;
+    /**
+     * lncli: `deletefwdhistory`
+     * DeleteForwardingHistory allows the caller to delete forwarding history
+     * events with a timestamp at or before a specified time. This is useful
+     * for implementing data retention policies for privacy purposes. The call
+     * deletes events in batches and returns statistics including the total number
+     * of events deleted and the aggregate fees earned from those events. The
+     * deletion is performed in a transaction-safe manner with configurable batch
+     * sizes to avoid holding large database locks.
+     */
+    deleteForwardingHistory(
+        request?: DeepPartial<DeleteForwardingHistoryRequest>
+    ): Promise<DeleteForwardingHistoryResponse>;
 }
 
 type Builtin =

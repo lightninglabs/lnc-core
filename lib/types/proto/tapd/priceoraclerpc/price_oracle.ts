@@ -78,6 +78,21 @@ export enum Intent {
 }
 
 /**
+ * ErrorCode represents the possible error codes that can be returned in a
+ * QueryAssetRatesErrResponse.
+ */
+export enum ErrorCode {
+    /** UNSPECIFIED_ORACLE_ERROR_CODE - UNSPECIFIED_ORACLE_ERROR_CODE indicates an unspecified error. */
+    UNSPECIFIED_ORACLE_ERROR_CODE = 'UNSPECIFIED_ORACLE_ERROR_CODE',
+    /**
+     * UNSUPPORTED_ASSET_ORACLE_ERROR_CODE - UNSUPPORTED_ASSET_ORACLE_ERROR_CODE indicates the asset is not
+     * supported.
+     */
+    UNSUPPORTED_ASSET_ORACLE_ERROR_CODE = 'UNSUPPORTED_ASSET_ORACLE_ERROR_CODE',
+    UNRECOGNIZED = 'UNRECOGNIZED'
+}
+
+/**
  * FixedPoint is a scaled integer representation of a fractional number.
  *
  * This type consists of two integer fields: a coefficient and a scale.
@@ -229,6 +244,15 @@ export interface QueryAssetRatesRequest {
      * field will only be set by tapd v0.7.0 and later.
      */
     metadata: string;
+    /**
+     * node_id is the 33-byte public key of the local node making the
+     * request to the price oracle. This identifies the tapd node that is
+     * querying rates, as opposed to the counterparty_id field which
+     * identifies the peer on the other side of the transaction. This field
+     * is set by default and can be disabled via the
+     * --experimental.rfq.priceoracledisablenodeid configuration option.
+     */
+    nodeId: Uint8Array | string;
 }
 
 /**
@@ -245,7 +269,7 @@ export interface QueryAssetRatesErrResponse {
     /** error is the error message. */
     message: string;
     /** code is the error code. */
-    code: number;
+    code: ErrorCode;
 }
 
 /** QueryAssetRatesResponse is the response from a QueryAssetRates RPC call. */

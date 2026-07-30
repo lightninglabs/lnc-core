@@ -1,7 +1,20 @@
 /* eslint-disable */
+export enum SortDirection {
+    /** SORT_DIRECTION_DESC - Sort results in descending order. */
+    SORT_DIRECTION_DESC = 'SORT_DIRECTION_DESC',
+    /** SORT_DIRECTION_ASC - Sort results in ascending order. */
+    SORT_DIRECTION_ASC = 'SORT_DIRECTION_ASC',
+    UNRECOGNIZED = 'UNRECOGNIZED'
+}
+
 /** Represents a Bitcoin transaction outpoint. */
 export interface OutPoint {
-    /** Raw bytes representing the transaction id. */
+    /**
+     * Raw bytes representing the transaction id. Must be in
+     * internal byte order (little-endian), i.e. reversed
+     * compared to the human-readable (RPC/block explorer)
+     * hex encoding.
+     */
     txid: Uint8Array | string;
     /** The index of the output on the transaction. */
     outputIndex: number;

@@ -224,6 +224,49 @@ export enum WitnessType {
      * counterparty's who broadcasts a revoked taproot commitment transaction.
      */
     TAPROOT_COMMITMENT_REVOKE = 'TAPROOT_COMMITMENT_REVOKE',
+    /**
+     * TAPROOT_LOCAL_COMMIT_SPEND_FINAL - A witness type that allows us to spend our settled local commitment after a
+     * CSV delay when we force close a production taproot channel.
+     */
+    TAPROOT_LOCAL_COMMIT_SPEND_FINAL = 'TAPROOT_LOCAL_COMMIT_SPEND_FINAL',
+    /**
+     * TAPROOT_REMOTE_COMMIT_SPEND_FINAL - A witness type that allows us to spend our settled local commitment after
+     * a CSV delay when the remote party has force closed a production taproot
+     * channel.
+     */
+    TAPROOT_REMOTE_COMMIT_SPEND_FINAL = 'TAPROOT_REMOTE_COMMIT_SPEND_FINAL',
+    /**
+     * TAPROOT_HTLC_OFFERED_TIMEOUT_SECOND_LEVEL_FINAL - A witness that allows us to timeout an HTLC we offered to the remote party
+     * on our production taproot commitment transaction. We use this when we need
+     * to go on chain to time out an HTLC.
+     */
+    TAPROOT_HTLC_OFFERED_TIMEOUT_SECOND_LEVEL_FINAL = 'TAPROOT_HTLC_OFFERED_TIMEOUT_SECOND_LEVEL_FINAL',
+    /**
+     * TAPROOT_HTLC_ACCEPTED_SUCCESS_SECOND_LEVEL_FINAL - A witness type that allows us to sweep an HTLC we accepted on our
+     * production taproot commitment transaction after we go to the second level
+     * on chain.
+     */
+    TAPROOT_HTLC_ACCEPTED_SUCCESS_SECOND_LEVEL_FINAL = 'TAPROOT_HTLC_ACCEPTED_SUCCESS_SECOND_LEVEL_FINAL',
+    /**
+     * TAPROOT_HTLC_OFFERED_REMOTE_TIMEOUT_FINAL - A witness that allows us to sweep an HTLC we offered to the remote party
+     * that lies on the production taproot commitment transaction for the remote
+     * party. We can spend this output after the absolute CLTV timeout of the
+     * HTLC as passed.
+     */
+    TAPROOT_HTLC_OFFERED_REMOTE_TIMEOUT_FINAL = 'TAPROOT_HTLC_OFFERED_REMOTE_TIMEOUT_FINAL',
+    /**
+     * TAPROOT_HTLC_ACCEPTED_REMOTE_SUCCESS_FINAL - A witness that allows us to sweep an HTLC that was offered to us by the
+     * remote party for a production taproot channel. We use this witness in the
+     * case that the remote party goes to chain, and we know the pre-image to the
+     * HTLC. We can sweep this without any additional timeout.
+     */
+    TAPROOT_HTLC_ACCEPTED_REMOTE_SUCCESS_FINAL = 'TAPROOT_HTLC_ACCEPTED_REMOTE_SUCCESS_FINAL',
+    /**
+     * TAPROOT_COMMITMENT_REVOKE_FINAL - A witness type that allows us to sweep the settled output of a malicious
+     * counterparty's who broadcasts a revoked production taproot commitment
+     * transaction.
+     */
+    TAPROOT_COMMITMENT_REVOKE_FINAL = 'TAPROOT_COMMITMENT_REVOKE_FINAL',
     UNRECOGNIZED = 'UNRECOGNIZED'
 }
 
@@ -1458,6 +1501,7 @@ export interface WalletKit {
      */
     fundPsbt(request?: DeepPartial<FundPsbtRequest>): Promise<FundPsbtResponse>;
     /**
+     * lncli: `wallet psbt sign`
      * SignPsbt expects a partial transaction with all inputs and outputs fully
      * declared and tries to sign all unsigned inputs that have all required fields
      * (UTXO information, BIP32 derivation information, witness or sig scripts)

@@ -230,6 +230,34 @@ export interface MailboxInfoResponse {
     messageCount: string;
 }
 
+/** Request message for the RemoveMessage RPC. */
+export interface RemoveMessageRequest {
+    /**
+     * The public key identifier of the receiver whose messages should be
+     * removed, encoded as the raw bytes of the compressed public key. This
+     * is the same key used when subscribing for messages via ReceiveMessages.
+     */
+    receiverId: Uint8Array | string;
+    /**
+     * The IDs of the messages to remove. Only messages that belong to the
+     * specified receiver will be deleted. IDs that don't exist or belong to
+     * a different receiver are silently skipped.
+     */
+    messageIds: string[];
+    /**
+     * A Schnorr signature proving ownership of the receiver key. The
+     * signature must be over SHA256(receiver_id || msg_id_1 || msg_id_2 ||
+     * ...) where each message ID is encoded as a big-endian uint64.
+     */
+    signature: Uint8Array | string;
+}
+
+/** Response message for the RemoveMessage RPC. */
+export interface RemoveMessageResponse {
+    /** The number of messages that were actually removed. */
+    numRemoved: string;
+}
+
 /**
  * Service definition for the authenticated mailbox. This service allows sending
  * messages (authenticated by UTXO proof) and receiving messages (authenticated
@@ -267,6 +295,15 @@ export interface Mailbox {
     mailboxInfo(
         request?: DeepPartial<MailboxInfoRequest>
     ): Promise<MailboxInfoResponse>;
+    /**
+     * Removes one or more messages from the mailbox. The caller must prove
+     * ownership of the receiver key by providing a Schnorr signature over
+     * SHA256(receiver_id || big-endian uint64 message_id_1 || ...).
+     * Only messages that belong to the authenticated receiver are deleted.
+     */
+    removeMessage(
+        request?: DeepPartial<RemoveMessageRequest>
+    ): Promise<RemoveMessageResponse>;
 }
 
 type Builtin =

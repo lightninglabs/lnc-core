@@ -38,6 +38,10 @@ curl ${LND_URL}/${LND_RELEASE_TAG}/lnrpc/peersrpc/peers.proto --create-dirs -o p
 curl ${LND_URL}/${LND_RELEASE_TAG}/lnrpc/stateservice.proto --create-dirs -o protos/lnd/${LND_RELEASE_TAG}/stateservice.proto
 
 curl ${LOOP_URL}/${LOOP_RELEASE_TAG}/looprpc/client.proto --create-dirs -o protos/loop/${LOOP_RELEASE_TAG}/client.proto
+# lnc-core stores lnd's lightning.proto directly at its proto root, while
+# recent Loop releases import it using lnd's repository-relative path.
+sed -i.bak 's|import "lnrpc/lightning.proto";|import "lightning.proto";|' protos/loop/${LOOP_RELEASE_TAG}/client.proto
+rm protos/loop/${LOOP_RELEASE_TAG}/client.proto.bak
 curl ${LOOP_URL}/${LOOP_RELEASE_TAG}/looprpc/debug.proto --create-dirs -o protos/loop/${LOOP_RELEASE_TAG}/debug.proto
 curl ${LOOP_URL}/${LOOP_RELEASE_TAG}/swapserverrpc/common.proto --create-dirs -o protos/loop/${LOOP_RELEASE_TAG}/swapserverrpc/common.proto
 curl ${LOOP_URL}/${LOOP_RELEASE_TAG}/swapserverrpc/server.proto --create-dirs -o protos/loop/${LOOP_RELEASE_TAG}/swapserverrpc/server.proto

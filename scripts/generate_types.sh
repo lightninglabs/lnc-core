@@ -83,6 +83,7 @@ echo "LOOP: running protoc..."
 mkdir -p "$GENERATED_TYPES_DIR/loop"
 protoc/bin/protoc \
   --proto_path=protos/loop/${LOOP_RELEASE_TAG} \
+  --proto_path=protos/lnd/${LND_RELEASE_TAG} \
   --plugin=./node_modules/.bin/protoc-gen-ts_proto \
   --ts_proto_out=$GENERATED_TYPES_DIR/loop \
   $TS_PROTO_OPTIONS \
@@ -181,6 +182,7 @@ echo "LOOP: generating schema..."
 mkdir -p "$SCHEMA_DIR/loop"
 protoc/bin/protoc \
   --proto_path=protos/loop/${LOOP_RELEASE_TAG} \
+  --proto_path=protos/lnd/${LND_RELEASE_TAG} \
   --plugin=./node_modules/.bin/protoc-gen-ts_proto \
   --ts_proto_out=$SCHEMA_DIR/loop \
   $SCHEMA_PROTO_OPTIONS \
