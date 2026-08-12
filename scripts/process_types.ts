@@ -32,7 +32,34 @@ type DeepPartial<T> = T extends Builtin
  */
 
 const typesDir = 'lib/types/proto';
+const schemaDir = 'lib/types/schema';
 const files = glob.sync(`${typesDir}/**/*.ts`);
+const schemaFiles = glob.sync(`${schemaDir}/**/*.ts`);
+
+/**
+ * The WASM client is called with the method name from the proto with only its
+ * first letter lower-cased (ex: RegisterRPCMiddleware -> registerRPCMiddleware).
+ * ts-proto instead splits acronyms when it camel-cases service methods, which
+ * would yield registerRpcMiddleware and produce a method name that the WASM
+ * client does not recognize. Map the generated names back to the form the
+ * client expects, keyed by the lower-cased proto name so that the lookup does
+ * not depend on which casing rules ts-proto applied.
+ */
+const uncapitalize = (s: string) =>
+    s.substring(0, 1).toLowerCase() + s.substring(1);
+const methodNames: Record<string, string> = {};
+schemaFiles.forEach((file) => {
+    const imports = require(`../${file}`);
+    const definitionName = Object.keys(imports).find((i) =>
+        i.endsWith('Definition')
+    );
+    if (!definitionName) return;
+
+    Object.values(imports[definitionName].methods).forEach((m: any) => {
+        methodNames[m.name.toLowerCase()] = uncapitalize(m.name);
+    });
+});
+
 files.forEach((file, i) => {
     const tempFile = `${typesDir}/temp-${i}.d.ts`;
 
@@ -43,11 +70,29 @@ files.forEach((file, i) => {
         flags: 'a'
     });
 
-    reader.on('line', (line) => {
-        // remove this import since its usage is replaced below
-        if (line === "import { Observable } from 'rxjs';") return;
+    const processLine = (line: string) => {
+        // remove this import since its usage is replaced below. the quote style
+        // depends on the ts-proto version, so match either form.
+        if (/^import \{ Observable \} from ['"]rxjs['"];$/.test(line.trim()))
+            return;
 
-        let newLine = line;
+        // strip the leading pipe left behind after joining a wrapped union type
+        // before: assetId?: | Uint8Array | undefined;
+        // after: assetId?: Uint8Array | undefined;
+        let newLine = line.replace(/(\??:)\s*\|\s*/, '$1 ');
+
+        // restore the method name casing that the WASM client expects
+        // before: registerRpcMiddleware(
+        // after: registerRPCMiddleware(
+        const method = newLine.match(/^(\s*)([A-Za-z0-9_]+)\(/);
+        if (method) {
+            const expected = methodNames[method[2].toLowerCase()];
+            if (expected && expected !== method[2]) {
+                newLine = `${method[1]}${expected}(${newLine.slice(
+                    method[0].length
+                )}`;
+            }
+        }
 
         // replace Observable<T> return value with onMessage & onError callbacks
         // before: monitor(request: MonitorRequest): Observable<SwapStatus>;
@@ -86,9 +131,31 @@ files.forEach((file, i) => {
 
         writer.write(newLine);
         writer.write(os.EOL);
+    };
+
+    // ts-proto wraps long union types across multiple lines, ex:
+    //   assetId?:
+    //     | Uint8Array
+    //     | undefined;
+    // The replacements above operate on a single line, so buffer each line in
+    // order to join the continuation lines back onto their declaration first.
+    // Comment lines are never treated as continuations since they are prefixed
+    // with a '*', which keeps markdown tables in the proto docs intact.
+    let pending: string | null = null;
+
+    reader.on('line', (line) => {
+        if (pending !== null && line.trimStart().startsWith('|')) {
+            pending = `${pending} ${line.trim()}`;
+            return;
+        }
+
+        if (pending !== null) processLine(pending);
+        pending = line;
     });
 
     reader.on('close', () => {
+        if (pending !== null) processLine(pending);
+
         // inject the DeepPartial type manually because we would need to include
         // a bunch of JS code in order to have it injected by the ts-proto plugin
         writer.write(deepPartialCode);
@@ -111,8 +178,6 @@ const services: Record<string, Record<string, string>> = {};
 const subscriptionMethods: string[] = [];
 const pkgFiles: Record<string, string[]> = {};
 
-const schemaDir = 'lib/types/schema';
-const schemaFiles = glob.sync(`${schemaDir}/**/*.ts`);
 schemaFiles.forEach((file) => {
     // get all of the exports from the generated file
     const imports = require(`../${file}`);
